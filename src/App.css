@@ -10,19 +10,34 @@ body {
   padding: 20px;
 }
 
+/* --- Header styles for a centered, larger logo --- */
 header {
-  text-align: center;
-  margin-bottom: 40px;
+  display: flex;
+  flex-direction: column; /* Stacks the logo and titles vertically */
+  align-items: center;    /* Horizontally centers the content */
+  margin-bottom: 20px;
+}
+
+.header-logo {
+  height: 100px; /* Increased the height for a larger logo. Adjust as needed! */
+  margin-bottom: 10px; /* Adds space between the logo and the title */
+  margin-right: 0; /* Removes the margin from the previous layout */
+}
+
+.header-titles {
+  text-align: center; /* Ensures the h1 and p text are centered */
 }
 
 header h1 {
   font-size: 2.5rem;
-  color: #2c3e50;
+  color: #0A4624;
+  margin: 0;
 }
 
 header p {
     color: #7f8c8d;
     font-size: 1rem;
+    margin-top: 5px;
 }
 
 .grid-container {
@@ -63,7 +78,7 @@ header p {
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 0;
-  color: #2980b9;
+  color: #0A4624; /* Forest Green */
 }
 
 .card p span {
@@ -108,19 +123,20 @@ header p {
 
 /* History Button */
 .history-btn {
-  background-color: #3498db;
-  color: white;
+  background-color: #FDB813; /* Golden Yellow */
+  color: #0A4624; /* Forest Green text for contrast */
   border: none;
   padding: 10px 20px;
   border-radius: 5px;
   font-size: 1rem;
+  font-weight: bold; /* Make text bolder */
   cursor: pointer;
   transition: background-color 0.3s ease;
   margin-bottom: 10px;
 }
 
 .history-btn:hover {
-  background-color: #2980b9;
+  background-color: #e4a50f; /* A slightly darker yellow for hover */
 }
 
 /* Modal Styles */
@@ -188,4 +204,17 @@ th {
 
 tbody tr:nth-child(even) {
   background-color: #f9f9f9;
+}
+/* Add this block if it's missing, or ensure it looks like this */
+.main-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 40px;
+}
+
+.last-updated {
+    color: #7f8c8d;
+    font-size: 1rem;
 }

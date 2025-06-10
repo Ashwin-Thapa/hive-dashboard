@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { ref, onValue, query, limitToLast, get, orderByKey } from 'firebase/database';
 import Chart from 'react-apexcharts';
 import './App.css';
+import bwiseLogo from './assets/Bwise Le Organica Logo.png';
 
 // No changes to any of the component definitions
 const InfoCard = ({ title, value, unit }) => ( <div className="card"><h3>{title}</h3><p>{value} <span>{unit}</span></p></div> );
@@ -19,8 +20,8 @@ function App() {
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     const getSoundColor = (voltage) => {
-        if (voltage > 2.5) return '#e74c3c';
-        if (voltage > 1.0) return '#f39c12';
+        if (voltage >= 1.0) return '#e74c3c';
+        if (voltage >= 0.5) return '#f39c12';
         return '#2ecc71';
     };
 
@@ -45,7 +46,7 @@ function App() {
         setIsModalOpen(true); setIsHistoryLoading(true); const historyRef = ref(db, 'sensor_readings'); const historyQuery = query(historyRef, orderByKey(), limitToLast(10)); const snapshot = await get(historyQuery); if (snapshot.exists()) { const data = Object.values(snapshot.val()).reverse(); setFullHistory(data); } setIsHistoryLoading(false);
     };
 
-    const weightChartOptions = { chart: { id: 'realtime-weight', animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 1000 } }, toolbar: { show: false }, zoom: { enabled: false }}, dataLabels: { enabled: false }, stroke: { curve: 'smooth' }, title: { text: 'Hive Weight History', align: 'left' }, markers: { size: 0 }, xaxis: { type: 'datetime' }, yaxis: { title: { text: 'Weight (g)' }, labels: { formatter: (val) => val.toFixed(2), }}, legend: { show: false }, };
+    const weightChartOptions = { chart: { id: 'realtime-weight', animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 1000 } }, toolbar: { show: false }, zoom: { enabled: false }}, dataLabels: { enabled: false }, stroke: { curve: 'smooth' }, title: { text: 'Hive Weight History', align: 'left' }, markers: { size: 0 }, xaxis: { type: 'datetime' }, yaxis: { title: { text: 'Weight (g)' }, labels: { formatter: (val) => val.toFixed(2), }}, legend: { show: false }, colors: ['#FDB813'], };
     const weightChartSeries = [{ name: 'Weight', data: weightHistory }];
     const tempColor = getTemperatureColor(sensorData.temperature);
     const humidityColor = getHumidityColor(sensorData.humidity);
@@ -60,16 +61,24 @@ function App() {
             <HistoryModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={fullHistory} isLoading={isHistoryLoading}/>
             <div className="dashboard-container">
                 <header>
-                    <h1>Hive Monitoring Dashboard</h1>
-                    <button className="history-btn" onClick={handleHistoryButtonClick}>View Full History</button>
-                    {sensorData.timestamp && <p>Last Updated: {new Date(sensorData.timestamp).toLocaleString()}</p>}
+                    <img src={bwiseLogo} alt="Bwise Le Organica Logo" className="header-logo" />
+                    <div className="header-titles">
+                        <h1>Hive Monitoring Dashboard</h1>
+                        <p>A Bwise Le Organica Project</p>
+                    </div>
                 </header>
+
                 <main>
+                    {/* This div centers the button and the timestamp */}
+                    <div className="main-actions">
+                        <button className="history-btn" onClick={handleHistoryButtonClick}>View Full History</button>
+                        {sensorData.timestamp && <p className="last-updated">Last Updated: {new Date(sensorData.timestamp).toLocaleString()}</p>}
+                    </div>
+
                     <div className="grid-container">
                         <div className="grid-item"> {sensorData.temperature != null && ( <GaugeChart value={sensorData.temperature} title="Temperature" unit="°C" min={0} max={50} colors={[tempColor]} /> )} </div>
                         <div className="grid-item"> {sensorData.humidity != null && ( <GaugeChart value={sensorData.humidity} title="Humidity" unit="%" min={0} max={100} colors={[humidityColor]} /> )} </div>
-                        {/* --- MODIFIED: The check now correctly handles the number 0 --- */}
-                        <div className="grid-item"> {sensorData.sound_voltage_num != null && ( <GaugeChart value={sensorData.sound_voltage_num} title="Sound" unit="V" min={0} max={5} colors={[soundColor]} /> )} </div>
+                        <div className="grid-item"> {sensorData.sound_voltage_num != null && ( <GaugeChart value={sensorData.sound_voltage_num} title="Sound" unit="V" min={0} max={3.5} colors={[soundColor]} /> )} </div>
                         <div className="grid-item large"> <Chart options={weightChartOptions} series={weightChartSeries} type="line" height={350} /> </div>
                         <div className="grid-item"> <InfoCard title="Location" value={sensorData.location} /> </div>
                         <div className="grid-item"> <InfoCard title="Device ID" value={sensorData.device_id} /> </div>
