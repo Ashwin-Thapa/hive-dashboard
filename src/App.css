@@ -1,38 +1,191 @@
-.App {
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f4f7f6;
+  margin: 0;
+  padding: 0;
+  color: #333;
+}
+
+.dashboard-container {
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+header h1 {
+  font-size: 2.5rem;
+  color: #2c3e50;
+}
+
+header p {
+    color: #7f8c8d;
+    font-size: 1rem;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.grid-item {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.grid-item.large {
+    grid-column: span 3;
+}
+
+/* Styling for the simple info cards (Location, Device ID) */
+.card {
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.card h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  color: #34495e;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.card p {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0;
+  color: #2980b9;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.card p span {
+    font-size: 1rem;
+    font-weight: normal;
+    color: #7f8c8d;
+    margin-left: 5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    /* On medium screens, go to 2 columns */
+    .grid-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .grid-item.large {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 768px) {
+    /* On small screens, go to 1 column */
+    .grid-container {
+        grid-template-columns: 1fr;
+    }
+    .grid-item.large {
+        grid-column: span 1;
+    }
+    header h1 {
+        font-size: 2rem;
+    }
+}
+
+.loading-screen {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  align-items: center;
+  height: 100vh;
+  font-size: 1.5rem;
+  color: #2c3e50;
+}
+
+/* History Button */
+.history-btn {
+  background-color: #3498db;
   color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-bottom: 10px;
 }
 
-.App-link {
-  color: #61dafb;
+.history-btn:hover {
+  background-color: #2980b9;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px 30px;
+  border-radius: 8px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #aaa;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  color: #2c3e50;
+}
+
+/* Table Styles */
+.table-container {
+  width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
 }
