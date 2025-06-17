@@ -5,10 +5,28 @@ import Chart from 'react-apexcharts';
 import './App.css';
 import bwiseLogo from './assets/Bwise Le Organica Logo.png';
 
-// No changes to any of the component definitions
+// --- MODIFIED: VideoStream now has the 4/3 aspect ratio and a className ---
+const VideoStream = () => (
+    <div className="video-stream-container">
+      <h3>Live Hive Entrance</h3>
+      <iframe 
+        className="video-iframe" // Added a class for styling
+        width="100%" 
+        style={{ aspectRatio: "4 / 3" }} // Set to 4/3 ratio
+        src="https://www.youtube.com/embed/76aIp54LR3k?si=Lyuoo3iWe8bkyUbX" // IMPORTANT: Use your correct embed URL
+        title="YouTube video player" 
+        frameBorder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+        allowFullScreen>
+      </iframe>
+    </div>
+);
+
+
+// No changes to other components
 const InfoCard = ({ title, value, unit }) => ( <div className="card"><h3>{title}</h3><p>{value} <span>{unit}</span></p></div> );
 const GaugeChart = ({ value, title, unit, min, max, colors }) => { const options = { chart: { type: 'radialBar' }, plotOptions: { radialBar: { hollow: { size: '70%' }, dataLabels: { name: { offsetY: -10, fontSize: '22px' }, value: { fontSize: '16px' }, total: { show: true, label: title, formatter: () => `${value} ${unit}`, }, }, }, }, fill: { colors }, labels: [title], stroke: { lineCap: 'round' }, grid: { padding: { top: -10 } }, series: [((value - min) / (max - min)) * 100], }; return <Chart options={options} series={options.series} type="radialBar" height={350} />; };
-const HistoryModal = ({ isOpen, onClose, data, isLoading }) => { if (!isOpen) return null; return ( <div className="modal-overlay" onClick={onClose}> <div className="modal-content" onClick={e => e.stopPropagation()}> <button className="modal-close-btn" onClick={onClose}>&times;</button> <h2>Recent Sensor History</h2> {isLoading ? ( <p>Loading history...</p> ) : ( <div className="table-container"> <table> <thead> <tr> <th>Timestamp</th> <th>Temp (°C)</th> <th>Humidity (%)</th> <th>Weight (g)</th> <th>Sound</th> </tr> </thead> <tbody> {data.map(reading => ( <tr key={reading.timestamp}> <td>{new Date(reading.timestamp).toLocaleString()}</td> <td>{reading.temperature}</td> <td>{reading.humidity}</td> <td>{reading.weight}</td> <td>{reading.sound_voltage}</td> </tr> ))} </tbody> </table> </div> )} </div> </div> ); };
+const HistoryModal = ({ isOpen, onClose, data, isLoading }) => { if (!isOpen) return null; return ( <div className="modal-overlay" onClick={onClose}> <div className="modal-content" onClick={e => e.stopPropagation()}> <button className="modal-close-btn" onClick={onClose}>×</button> <h2>Recent Sensor History</h2> {isLoading ? ( <p>Loading history...</p> ) : ( <div className="table-container"> <table> <thead> <tr> <th>Timestamp</th> <th>Temp (°C)</th> <th>Humidity (%)</th> <th>Weight (g)</th> <th>Sound</th> </tr> </thead> <tbody> {data.map(reading => ( <tr key={reading.timestamp}> <td>{new Date(reading.timestamp).toLocaleString()}</td> <td>{reading.temperature}</td> <td>{reading.humidity}</td> <td>{reading.weight}</td> <td>{reading.sound_voltage}</td> </tr> ))} </tbody> </table> </div> )} </div> </div> ); };
 
 
 function App() {
@@ -69,7 +87,6 @@ function App() {
                 </header>
 
                 <main>
-                    {/* This div centers the button and the timestamp */}
                     <div className="main-actions">
                         <button className="history-btn" onClick={handleHistoryButtonClick}>View Full History</button>
                         {sensorData.timestamp && <p className="last-updated">Last Updated: {new Date(sensorData.timestamp).toLocaleString()}</p>}
@@ -79,6 +96,11 @@ function App() {
                         <div className="grid-item"> {sensorData.temperature != null && ( <GaugeChart value={sensorData.temperature} title="Temperature" unit="°C" min={0} max={50} colors={[tempColor]} /> )} </div>
                         <div className="grid-item"> {sensorData.humidity != null && ( <GaugeChart value={sensorData.humidity} title="Humidity" unit="%" min={0} max={100} colors={[humidityColor]} /> )} </div>
                         <div className="grid-item"> {sensorData.sound_voltage_num != null && ( <GaugeChart value={sensorData.sound_voltage_num} title="Sound" unit="V" min={0} max={3.5} colors={[soundColor]} /> )} </div>
+                        
+                        <div className="grid-item large">
+                            <VideoStream />
+                        </div>
+
                         <div className="grid-item large"> <Chart options={weightChartOptions} series={weightChartSeries} type="line" height={350} /> </div>
                         <div className="grid-item"> <InfoCard title="Location" value={sensorData.location} /> </div>
                         <div className="grid-item"> <InfoCard title="Device ID" value={sensorData.device_id} /> </div>

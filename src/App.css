@@ -218,3 +218,9 @@ tbody tr:nth-child(even) {
     color: #7f8c8d;
     font-size: 1rem;
 }
+/* --- NEW: Styling for the YouTube Iframe --- */
+.video-iframe {
+  border-radius: 8px; /* Matches the rounded corners of other cards */
+  border: 3px solid #FDB813; /* Golden Yellow border from your logo */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* A slightly more prominent shadow */
+}
