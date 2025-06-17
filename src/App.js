@@ -13,7 +13,7 @@ const VideoStream = () => (
         className="video-iframe" // Added a class for styling
         width="100%" 
         style={{ aspectRatio: "4 / 3" }} // Set to 4/3 ratio
-        src="https://www.youtube.com/embed/76aIp54LR3k?si=Lyuoo3iWe8bkyUbX" // IMPORTANT: Use your correct embed URL
+        src="https://www.youtube.com/embed/49E0whuXPgQ?si=6LRSz7x2GUQM1eb2" // IMPORTANT: Use your correct embed URL
         title="YouTube video player" 
         frameBorder="0" 
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
