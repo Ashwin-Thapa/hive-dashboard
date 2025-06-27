@@ -10,22 +10,20 @@ body {
   padding: 20px;
 }
 
-/* --- Header styles for a centered, larger logo --- */
 header {
   display: flex;
-  flex-direction: column; /* Stacks the logo and titles vertically */
-  align-items: center;    /* Horizontally centers the content */
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 20px;
 }
 
 .header-logo {
-  height: 100px; /* Increased the height for a larger logo. Adjust as needed! */
-  margin-bottom: 10px; /* Adds space between the logo and the title */
-  margin-right: 0; /* Removes the margin from the previous layout */
+  height: 100px;
+  margin-bottom: 10px;
 }
 
 .header-titles {
-  text-align: center; /* Ensures the h1 and p text are centered */
+  text-align: center;
 }
 
 header h1 {
@@ -42,7 +40,7 @@ header p {
 
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
@@ -59,13 +57,81 @@ header p {
   align-items: center;
 }
 
-.grid-item.large {
-    grid-column: span 3;
+/* --- UPDATED STYLES: Image card no longer spans multiple columns --- */
+@media (min-width: 960px) {
+  .grid-item.large, .grid-item-alerts {
+    grid-column: span 2;
+  }
 }
 
-/* Styling for the simple info cards (Location, Device ID) */
+/* --- UPDATED STYLES: Reduced width of weight card --- */
+@media (min-width: 1200px) {
+    .grid-item.large {
+        grid-column: span 2; /* Adjusted to match alerts card */
+    }
+    .grid-item-alerts {
+        grid-column: span 2;
+    }
+}
+
+
+/* --- Alerts Card Styles --- */
+.alerts-card {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  min-height: 250px;
+}
+
+.alerts-card h3 {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 5px;
+  margin-bottom: 8px;
+}
+
+.alert:last-child {
+  margin-bottom: 0;
+}
+
+.alert span {
+  font-size: 1.2rem;
+  margin-right: 10px;
+}
+
+.alert p {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  line-height: 1.4;
+}
+
+.alert-critical {
+  background-color: #fdd;
+  border-left: 4px solid #e74c3c;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  border-left: 4px solid #f39c12;
+}
+
+.alert-ok {
+  background-color: #d4edda;
+  border-left: 4px solid #2ecc71;
+}
+
 .card {
   text-align: center;
+  width: 100%;
 }
 
 .card h3 {
@@ -78,7 +144,7 @@ header p {
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 0;
-  color: #0A4624; /* Forest Green */
+  color: #0A4624;
 }
 
 .card p span {
@@ -88,28 +154,14 @@ header p {
     margin-left: 5px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 992px) {
-    /* On medium screens, go to 2 columns */
-    .grid-container {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .grid-item.large {
-        grid-column: span 2;
-    }
-}
-
-@media (max-width: 768px) {
-    /* On small screens, go to 1 column */
-    .grid-container {
-        grid-template-columns: 1fr;
-    }
-    .grid-item.large {
-        grid-column: span 1;
-    }
-    header h1 {
-        font-size: 2rem;
-    }
+/* --- UPDATED Image card styles for 4:3 ratio --- */
+.hive-image {
+  width: 100%;
+  aspect-ratio: 4 / 3; /* Enforces 4:3 aspect ratio */
+  object-fit: cover;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 10px;
 }
 
 .loading-screen {
@@ -121,32 +173,30 @@ header p {
   color: #2c3e50;
 }
 
-/* History Button */
-.history-btn {
-  background-color: #FDB813; /* Golden Yellow */
-  color: #0A4624; /* Forest Green text for contrast */
+.action-btn {
+  background-color: #FDB813;
+  color: #0A4624;
   border: none;
   padding: 10px 20px;
   border-radius: 5px;
   font-size: 1rem;
-  font-weight: bold; /* Make text bolder */
+  font-weight: bold;
   cursor: pointer;
   transition: background-color 0.3s ease;
   margin-bottom: 10px;
 }
 
-.history-btn:hover {
-  background-color: #e4a50f; /* A slightly darker yellow for hover */
+.action-btn:hover {
+  background-color: #e4a50f;
 }
 
-/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -157,30 +207,32 @@ header p {
   background-color: white;
   padding: 20px 30px;
   border-radius: 8px;
-  max-width: 800px;
-  width: 90%;
-  max-height: 80vh;
+  max-width: 90%;
+  max-height: 90vh;
   overflow-y: auto;
   position: relative;
 }
 
 .modal-close-btn {
   position: absolute;
-  top: 10px;
-  right: 15px;
-  background: none;
-  border: none;
-  font-size: 2rem;
+  top: -10px;
+  right: -10px;
+  background: white;
+  border: 1px solid #ccc;
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  border-radius: 50%;
   cursor: pointer;
-  color: #aaa;
 }
 
-.modal-content h2 {
-  margin-top: 0;
-  color: #2c3e50;
+.modal-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 40px);
+  border-radius: 4px;
 }
 
-/* Table Styles */
 .table-container {
   width: 100%;
 }
@@ -205,22 +257,30 @@ th {
 tbody tr:nth-child(even) {
   background-color: #f9f9f9;
 }
-/* Add this block if it's missing, or ensure it looks like this */
+
 .main-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
 }
 
 .last-updated {
     color: #7f8c8d;
-    font-size: 1rem;
+    font-size: 0.9rem;
+    margin: 0;
 }
-/* --- NEW: Styling for the YouTube Iframe --- */
-.video-iframe {
-  border-radius: 8px; /* Matches the rounded corners of other cards */
-  border: 3px solid #FDB813; /* Golden Yellow border from your logo */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* A slightly more prominent shadow */
+
+.footer {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+  color: #7f8c8d;
+}
+
+.footer p {
+  margin: 5px 0;
+  font-size: 0.9rem;
 }
