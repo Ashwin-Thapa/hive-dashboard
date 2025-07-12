@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase';
+import { db } from './firebase'; // This import works perfectly with your new setup
 import { ref, onValue, query, limitToLast, get, orderByKey } from 'firebase/database';
 import Chart from 'react-apexcharts';
 import './App.css';
 import bwiseLogo from './assets/Bwise Le Organica Logo.png';
 
-// --- Sub-components ---
+// --- Sub-components (No changes here) ---
 
 const GaugeChart = ({ value, title, unit, min, max, colors }) => {
   const options = {
@@ -46,44 +46,45 @@ const ImageModal = ({ url, onClose }) => {
 };
 
 const HistoryModal = ({ isOpen, onClose, data, isLoading }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose}>×</button>
-        <h2>Recent Hive History (Last 20 Records)</h2>
-        {isLoading ? (
-          <p>Loading history...</p>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Temp (°C)</th>
-                  <th>Humidity (%)</th>
-                  <th>Weight (g)</th>
-                  <th>Sound (dB)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((reading, index) => (
-                  <tr key={index}>
-                    <td>{new Date(reading.timestamp).toLocaleString()}</td>
-                    <td>{reading.temperature_celsius}</td>
-                    <td>{reading.humidity_percent}</td>
-                    <td>{reading.hive_weight_grams}</td>
-                    <td>{reading.hive_sound_level_db}</td>
+    if (!isOpen) return null;
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+          <h2>Recent Hive History (Last 20 Records)</h2>
+          {isLoading ? (
+            <p>Loading history...</p>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Temp (°C)</th>
+                    <th>Humidity (%)</th>
+                    <th>Weight (g)</th>
+                    <th>Sound (dB)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {data.map((reading, index) => (
+                    <tr key={index}>
+                      {/* Convert Unix timestamp from seconds to milliseconds for Date() */}
+                      <td>{new Date(reading.timestamp * 1000).toLocaleString()}</td>
+                      <td>{reading.temperature}</td>
+                      <td>{reading.humidity}</td>
+                      <td>{reading.weight}</td>
+                      <td>{reading.sound_dB}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 const AlertsCard = ({ alerts }) => {
   if (alerts.length === 0) {
@@ -128,12 +129,12 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [alerts, setAlerts] = useState([]);
 
-  // --- UPDATED Alert Logic ---
+  // --- Alert Logic ---
   useEffect(() => {
     const newAlerts = [];
     if (sensorData.temperature === undefined) return;
 
-    const { temperature, humidity, sound_voltage_num: sound } = sensorData;
+    const { temperature, humidity, sound } = sensorData;
 
     // Temperature Alerts
     if (temperature < 30 || temperature > 36.5) {
@@ -149,10 +150,10 @@ function App() {
       newAlerts.push({ type: 'warning', message: `Warning Humidity: ${humidity}%` });
     }
 
-    // Sound Alerts
-    if (sound > -33 || sound < -42) {
+    // Sound Alerts (adjust ranges as needed)
+    if (sound > 40 || sound < 20) {
       newAlerts.push({ type: 'critical', message: `Critical Sound Level: ${sound}dB` });
-    } else if ((sound >= -34.9 && sound <= -33) || (sound >= -42 && sound < -40)) {
+    } else if ((sound >= 35 && sound <= 40) || (sound >= 20 && sound < 25)) {
       newAlerts.push({ type: 'warning', message: `Warning Sound Level: ${sound}dB` });
     }
     
@@ -162,15 +163,16 @@ function App() {
 
 
   useEffect(() => {
+    // --- Path for historical data. IMPORTANT: Your script must save data here.
     const fetchHistoricalData = async () => {
-      const historyRef = ref(db, 'bwise_data');
+      const historyRef = ref(db, 'beehive_history');
       const historyQuery = query(historyRef, orderByKey(), limitToLast(20));
       const snapshot = await get(historyQuery);
       if (snapshot.exists()) {
         const data = snapshot.val();
         const historicalReadings = Object.values(data).map(reading => ({
-          x: new Date(reading.timestamp).getTime(),
-          y: parseFloat(reading.hive_weight_grams)
+          x: new Date(reading.timestamp * 1000).getTime(), // Convert Unix timestamp
+          y: parseFloat(reading.weight)
         }));
         setWeightHistory(historicalReadings);
       }
@@ -179,24 +181,31 @@ function App() {
 
     fetchHistoricalData();
 
-    const currentRef = ref(db, 'bwise_current');
+    // --- Path for LIVE data
+    const currentRef = ref(db, 'beehive');
+    
+    // --- Path for latest image URL. Update if your structure is different.
     const imageRef = ref(db, 'bwise_images/latest');
 
     const unsub1 = onValue(currentRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
+        // Map new data fields to the structure the app expects
         const processed = {
           ...data,
-          temperature: parseFloat(data.temperature_celsius),
-          humidity: parseFloat(data.humidity_percent),
-          weight: parseFloat(data.hive_weight_grams),
-          sound_voltage_num: parseFloat(data.hive_sound_level_db)
+          temperature: parseFloat(data.temperature),
+          humidity: parseFloat(data.humidity),
+          weight: parseFloat(data.weight),
+          sound: parseFloat(data.sound_dB), // Use 'sound' internally for consistency
+          timestamp: parseInt(data.timestamp, 10)
         };
         setSensorData(processed);
-        setLastUpdated(new Date(data.timestamp));
+        
+        // Convert Unix timestamp (seconds) to milliseconds for the Date object
+        setLastUpdated(new Date(processed.timestamp * 1000));
 
         const newPoint = {
-          x: new Date(processed.timestamp).getTime(),
+          x: new Date(processed.timestamp * 1000).getTime(),
           y: processed.weight
         };
 
@@ -221,7 +230,8 @@ function App() {
   const handleHistoryButtonClick = async () => {
     setIsModalOpen(true);
     setIsHistoryLoading(true);
-    const historyRef = ref(db, 'bwise_data');
+    // Path for historical data
+    const historyRef = ref(db, 'beehive_history');
     const historyQuery = query(historyRef, orderByKey(), limitToLast(20));
     const snapshot = await get(historyQuery);
     if (snapshot.exists()) {
@@ -245,7 +255,7 @@ function App() {
     }
   };
 
-  // --- UPDATED Color logic for gauges to match new alert criteria ---
+  // --- Color logic for gauges ---
   const getTempColor = (t) => {
     if (t < 30 || t > 36.5) return '#e74c3c'; // Critical
     if ((t >= 30 && t < 32) || (t > 35 && t <= 36.5)) return '#f39c12'; // Warning
@@ -257,8 +267,8 @@ function App() {
     return '#2ecc71'; // Ideal
   };
   const getSoundColor = (db) => {
-    if (db > -33 || db < -42) return '#e74c3c'; // Critical
-    if ((db >= -34.9 && db <= -33) || (db >= -42 && db < -40)) return '#f39c12'; // Warning
+    if (db > 40 || db < 20) return '#e74c3c'; // Critical
+    if ((db >= 35 && db <= 40) || (db >= 20 && db < 25)) return '#f39c12'; // Warning
     return '#2ecc71'; // Ideal
   };
 
@@ -309,7 +319,7 @@ function App() {
               <GaugeChart value={sensorData.humidity} title="Humidity" unit="%" min={20} max={90} colors={[getHumidityColor(sensorData.humidity)]} />
             </div>
             <div className="grid-item">
-              <GaugeChart value={sensorData.sound_voltage_num} title="Sound" unit="dB" min={-60} max={-20} colors={[getSoundColor(sensorData.sound_voltage_num)]} />
+              <GaugeChart value={sensorData.sound} title="Sound" unit="dB" min={10} max={50} colors={[getSoundColor(sensorData.sound)]} />
             </div>
             
             <AlertsCard alerts={alerts} />
