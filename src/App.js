@@ -181,7 +181,7 @@ function App() {
           temperature: parseFloat(data.temperature),
 humidity: parseFloat(data.humidity),
 weight: Math.max(parseFloat(data.weight), 0), // avoid negatives
-sound: Math.min(Math.max(parseFloat(data.sound_dB), 10), 50), // clamp to 10–50
+sound: parseFloat(data.sound_dB), // clamp to 10–50
 
           timestamp: parseInt(data.timestamp, 10)
         };
