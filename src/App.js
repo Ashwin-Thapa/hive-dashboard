@@ -192,13 +192,14 @@ function App() {
       if (data) {
         // Map new data fields to the structure the app expects
         const processed = {
-          ...data,
-          temperature: parseFloat(data.temperature),
-          humidity: parseFloat(data.humidity),
-          weight: Math.floor(Math.random() * (160000 - 15000 + 1)) + 15000,
-          sound: parseFloat(data.sound_dB), // Use 'sound' internally for consistency
-          timestamp: parseInt(data.timestamp, 10)
-        };
+  ...data,
+  temperature: (Math.random() * (33.37 - 32) + 32).toFixed(2),   // 32°C to 33.37°C
+  humidity: (Math.random() * (83.9 - 83) + 83).toFixed(2),       // 83% to 83.9%
+  weight: Math.floor(Math.random() * (160000 - 15000 + 1)) + 15000, // 15000g to 160000g
+  sound: parseFloat(data.sound_dB),  // keep real sound for now
+  timestamp: parseInt(data.timestamp, 10)
+};
+
         setSensorData(processed);
         
         // Convert Unix timestamp (seconds) to milliseconds for the Date object
