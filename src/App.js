@@ -137,9 +137,9 @@ function App() {
     const { temperature, humidity, sound } = sensorData;
 
     // Temperature Alerts
-    if (temperature < 30 || temperature > 36.5) {
+    if (temperature < 30 || temperature > 37) {
       newAlerts.push({ type: 'critical', message: `Critical Temperature: ${temperature}°C` });
-    } else if ((temperature >= 30 && temperature < 32) || (temperature > 35 && temperature <= 36.5)) {
+    } else if ((temperature >= 30 && temperature < 33) || (temperature > 36 && temperature <= 37)) {
       newAlerts.push({ type: 'warning', message: `Warning Temperature: ${temperature}°C` });
     }
 
@@ -151,9 +151,9 @@ function App() {
     }
 
     // Sound Alerts (adjust ranges as needed)
-    if (sound > 40 || sound < 20) {
+    if (sound < 20 || sound > 40) {
       newAlerts.push({ type: 'critical', message: `Critical Sound Level: ${sound}dB` });
-    } else if ((sound >= 35 && sound <= 40) || (sound >= 20 && sound < 25)) {
+    } else if ((sound >= 20 && sound < 25) || (sound > 35 && sound <= 40)) {
       newAlerts.push({ type: 'warning', message: `Warning Sound Level: ${sound}dB` });
     }
     
