@@ -170,30 +170,45 @@ function App() {
 
     fetchHistoricalData();
 
-    // Simulate sensor data every 10 seconds
-    const simulateData = () => {
-      const now = Date.now();
-      const simulated = {
-        temperature: parseFloat((Math.random() * (33.37 - 32) + 32).toFixed(2)),
-        humidity: parseFloat((Math.random() * (83.9 - 83) + 83).toFixed(2)),
-        weight: Math.floor(Math.random() * (160000 - 15000 + 1)) + 15000,
-        sound: parseFloat((Math.random() * (45 - 18) + 18).toFixed(2)),
-        timestamp: Math.floor(now / 1000)
-      };
+    const currentRef = ref(db, 'beehive');
+    const imageRef = ref(db, 'bwise_images/latest');
 
-      setSensorData(simulated);
-      setLastUpdated(new Date(now));
+    const unsub1 = onValue(currentRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const processed = {
+          ...data,
+          temperature: parseFloat(data.temperature),
+humidity: parseFloat(data.humidity),
+weight: Math.max(parseFloat(data.weight), 0), // avoid negatives
+sound: Math.min(Math.max(parseFloat(data.sound_dB), 10), 50), // clamp to 10–50
 
-      const newPoint = { x: now, y: simulated.weight };
-      setWeightHistory(prev => {
-        if (prev.length > 0 && prev[prev.length - 1].x === newPoint.x) return prev;
-        return [...prev.slice(-19), newPoint];
-      });
+          timestamp: parseInt(data.timestamp, 10)
+        };
+        setSensorData(processed);
+        setLastUpdated(new Date(processed.timestamp * 1000));
+
+        const newPoint = {
+          x: new Date(processed.timestamp * 1000).getTime(),
+          y: processed.weight
+        };
+
+        setWeightHistory(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].x === newPoint.x) return prev;
+          return [...prev.slice(-19), newPoint];
+        });
+      }
+    });
+
+    const unsub2 = onValue(imageRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data?.url) setLatestImage(data.url);
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
     };
-
-    simulateData();
-    const interval = setInterval(simulateData, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleHistoryButtonClick = async () => {
@@ -262,7 +277,6 @@ function App() {
     <>
       <ImageModal url={imageModalOpen ? latestImage : null} onClose={() => setImageModalOpen(false)} />
       <HistoryModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={fullHistory} isLoading={isHistoryLoading} />
-
       <div className="dashboard-container">
         <header>
           <img src={bwiseLogo} alt="Bwise Logo" className="header-logo" />
@@ -288,9 +302,20 @@ function App() {
             <div className="grid-item">
               <GaugeChart value={sensorData.sound} title="Sound" unit="dB" min={10} max={50} colors={[getSoundColor(sensorData.sound)]} />
             </div>
-
             <AlertsCard alerts={alerts} />
-
+            {latestImage && (
+              <div className="grid-item grid-item-image">
+                <div className="card">
+                  <h3>Latest Hive Image</h3>
+                  <img
+                    src={latestImage}
+                    alt="Hive Snapshot"
+                    className="hive-image"
+                    onClick={() => setImageModalOpen(true)}
+                  />
+                </div>
+              </div>
+            )}
             <div className="grid-item large">
               <div className="card">
                 <h3>Weight History (Last 20 Readings)</h3>
