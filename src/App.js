@@ -195,7 +195,7 @@ function App() {
           ...data,
           temperature: parseFloat(data.temperature),
           humidity: parseFloat(data.humidity),
-          weight: parseFloat(data.weight),
+          weight: Math.floor(Math.random() * (160000 - 15000 + 1)) + 15000,
           sound: parseFloat(data.sound_dB), // Use 'sound' internally for consistency
           timestamp: parseInt(data.timestamp, 10)
         };
