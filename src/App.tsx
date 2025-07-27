@@ -1,9 +1,10 @@
+// src/App.tsx
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
-// Removed WeightHistoryPoint and Chat from this import, as they are now used via Hive type or imported in types.ts
 import type { SensorData, Alert, HistoryEntry, Hive, ChatMessage } from './types';
-// Removed the following line: `import type { Chat } from '@google/genai';`
-import {
+import type { GenerateContentCandidate, GenerateContentResult } from '@google/genai'; // Import these types
+import { // ... (rest of your imports)
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
   HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH,
   SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_WARNING_HIGH, SOUND_CRITICAL_HIGH,
@@ -37,7 +38,6 @@ const fileToBase64 = (file: File): Promise<{ base64: string, mimeType: string }>
 
 // Helper to convert image URL to base64
 const urlToBase64 = async (url: string): Promise<{ base64: string, mimeType: string }> => {
-    // Note: This may fail if the image server has a strict Cross-Origin Resource Sharing (CORS) policy.
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Failed to fetch image. Status: ${response.status} ${response.statusText}`);
@@ -280,12 +280,18 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     }
 
     try {
-        const response = options.image
-            ? await chatInstance.sendMessage([ { text: finalPrompt }, { inlineData: { data: options.image.base64, mimeType: options.image.mimeType }}])
-            : await chatInstance.sendMessage(finalPrompt);
+        let response: GenerateContentResult; // Declare response type
+        if (options.image) {
+            response = await chatInstance.sendMessage([
+                { text: finalPrompt },
+                { inlineData: { data: options.image.base64, mimeType: options.image.mimeType } }
+            ]);
+        } else {
+            response = await chatInstance.sendMessage(finalPrompt);
+        }
         
         // Ensure modelResponse is always a string, even if response.text is undefined
-        const modelResponse: string = response.text || "No response from AI model."; 
+        const modelResponse: string = response.response.text() || "No response from AI model."; // Access response.response.text()
         
         setHivesData(prevHives => prevHives.map(hive => {
             if (hive.id === selectedHiveId) {
