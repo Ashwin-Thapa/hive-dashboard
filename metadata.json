@@ -1,0 +1,6 @@
+{
+  "name": "AI Beehive Monitoring Dashboard",
+  "description": "A modern, real-time dashboard to monitor beehive health metrics including temperature, humidity, weight, and sound. Features AI-powered health summaries from Google Gemini for insightful analysis.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
