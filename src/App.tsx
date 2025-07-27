@@ -293,13 +293,18 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     try {
         let response: GenerateContentResponse; 
         if (options.image) {
-            response = await chatInstance.sendMessage([
-                { text: finalPrompt },
-                { inlineData: { data: options.image.base64, mimeType: options.image.mimeType } }
-            ]);
-        } else {
-            response = await chatInstance.sendMessage(finalPrompt);
-        }
+  response = await chatInstance.sendMessage({
+    message: [
+      { text: finalPrompt },
+      { inlineData: { data: options.image.base64, mimeType: options.image.mimeType } }
+    ]
+  });
+} else {
+  response = await chatInstance.sendMessage({
+    message: finalPrompt
+  });
+}
+
         
         // **CORRECTED:** Removed () because .text is a getter property, not a method.
         // Optional chaining `?.` is still useful for `response` itself.
