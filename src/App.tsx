@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
-import type { SensorData, Alert, HistoryEntry, WeightHistoryPoint, Hive, ChatMessage } from './types'; // Import ChatMessage
-import type { Chat } from '@google/genai';
+// Removed WeightHistoryPoint and Chat from this import, as they are now used via Hive type or imported in types.ts
+import type { SensorData, Alert, HistoryEntry, Hive, ChatMessage } from './types';
+// Removed the following line: `import type { Chat } from '@google/genai';`
 import {
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
   HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH,

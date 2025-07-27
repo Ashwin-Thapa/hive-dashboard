@@ -1,4 +1,5 @@
 // src/types.ts
+import type { Chat } from '@google/genai'; // <--- KEEP THIS LINE (Crucial for Hive type)
 
 export enum AlertType {
   OK = 'ok',
