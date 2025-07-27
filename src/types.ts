@@ -1,44 +1,45 @@
-import type { Chat } from '@google/genai';
+// src/types.ts
 
 export enum AlertType {
-  CRITICAL = 'critical',
-  WARNING = 'warning',
   OK = 'ok',
+  WARNING = 'warning',
+  CRITICAL = 'critical',
 }
 
-export interface Alert {
-  type: AlertType;
-  message: string;
-}
-
-export interface SensorData {
+export type SensorData = {
   temperature: number;
   humidity: number;
   weight: number;
-  sound: number;
-  timestamp: number;
-}
+  sound: number; // in dB
+  timestamp: number; // Unix timestamp in milliseconds
+};
 
-export interface HistoryEntry extends SensorData {}
+export type Alert = {
+  type: AlertType;
+  message: string;
+};
 
-export interface WeightHistoryPoint {
+export type HistoryEntry = SensorData; // History entry is just sensor data with a timestamp
+
+export type WeightHistoryPoint = {
   timestamp: number;
   weight: number;
-}
+};
 
-export interface ChatMessage {
+// Update this type to allow content to be undefined
+export type ChatMessage = {
   role: 'user' | 'model';
-  content: string;
-}
+  content: string | undefined; // Changed from string to string | undefined
+};
 
-export interface Hive {
-    id: string;
-    name: string;
-    sensorData: SensorData;
-    weightHistory: WeightHistoryPoint[];
-    fullHistory: HistoryEntry[];
-    image: string;
-    imageTimestamp?: number;
-    chat?: Chat;
-    chatHistory: ChatMessage[];
-}
+export type Hive = {
+  id: string;
+  name: string;
+  sensorData: SensorData;
+  fullHistory: HistoryEntry[];
+  weightHistory: WeightHistoryPoint[];
+  image: string; // URL of the hive image
+  imageTimestamp: number | null; // Timestamp when the image was captured
+  chat: Chat | null; // Gemini ChatSession instance
+  chatHistory: ChatMessage[];
+};

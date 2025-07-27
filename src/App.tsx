@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
-import type { SensorData, Alert, HistoryEntry, WeightHistoryPoint, Hive } from './types';
+import type { SensorData, Alert, HistoryEntry, WeightHistoryPoint, Hive, ChatMessage } from './types'; // Import ChatMessage
 import type { Chat } from '@google/genai';
 import {
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [isChatLoading, setChatLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectURLsRef = useRef<string[]>([]); // To keep track of created object URLs for cleanup
 
   // Initialize all hives with placeholder/simulated data
   useEffect(() => {
@@ -115,6 +116,12 @@ const App: React.FC = () => {
       });
     }
     setHivesData(initialHives);
+
+    // Cleanup for any object URLs created during initial setup (though none explicitly here for images)
+    return () => {
+        objectURLsRef.current.forEach(url => URL.revokeObjectURL(url));
+        objectURLsRef.current = [];
+    };
   }, []);
   
   // Set up Firebase listeners for Hive #1
@@ -130,10 +137,12 @@ const App: React.FC = () => {
                     const newSensorData: SensorData = {
                         temperature: data.temperature || 0,
                         humidity: data.humidity || 0,
-                        weight: 20000 + Math.random() * 2000,
+                        // Ensure weight simulation matches the firebase data structure if it's coming from there
+                        weight: data.weight || (20000 + Math.random() * 2000), // Adjusted to use Firebase weight if available
                         sound: data.sound_dB || 0,
                         timestamp: data.timestamp * 1000,
                     };
+                    // Limit history to last 100 entries for performance
                     const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
                     return { ...hive, sensorData: newSensorData, fullHistory: updatedHistory, weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })) };
                 }
@@ -159,12 +168,15 @@ const App: React.FC = () => {
             const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
                 temperature: reading.temperature || 0,
                 humidity: reading.humidity || 0,
-                weight: 20000 + Math.random() * 2000,
+                // Ensure weight simulation matches the firebase data structure if it's coming from there
+                weight: reading.weight || (20000 + Math.random() * 2000), // Adjusted
                 sound: reading.sound_dB || 0,
                 timestamp: reading.timestamp * 1000,
             }));
             setHivesData(prev => prev.map(hive => hive.id === hive1Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
         }
+    }).catch(error => {
+        console.error("Error fetching beehive history:", error);
     });
 
     return () => { unsubscribeCurrent(); unsubscribeImage(); };
@@ -176,7 +188,7 @@ const App: React.FC = () => {
         setHivesData(prevHives => {
             const newTimestamp = Date.now();
             return prevHives.map(hive => {
-                 if (hive.id === 'bwise-1') return hive;
+                 if (hive.id === 'bwise-1') return hive; // Hive 1 is handled by Firebase
                  const newSensorData: SensorData = {
                     temperature: hive.sensorData.temperature + (Math.random() - 0.5) * 0.2,
                     humidity: hive.sensorData.humidity + (Math.random() - 0.5) * 2,
@@ -184,7 +196,7 @@ const App: React.FC = () => {
                     sound: hive.sensorData.sound + (Math.random() - 0.5) * 1,
                     timestamp: newTimestamp,
                 };
-                const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData];
+                const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData]; // Keep history trimmed
                 return { ...hive, sensorData: newSensorData, fullHistory: newFullHistory, weightHistory: newFullHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight }))};
             });
         });
@@ -207,7 +219,7 @@ const App: React.FC = () => {
     if (sound < SOUND_WARNING_LOW || sound >= SOUND_CRITICAL_HIGH) newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Sound: ${sound.toFixed(2)}dB. Indicates distress.` });
     else if (sound < SOUND_IDEAL_MIN || sound > SOUND_WARNING_HIGH) newAlerts.push({ type: AlertType.WARNING, message: `Warning Sound: ${sound.toFixed(2)}dB. Unusual activity.` });
     setAlerts(newAlerts);
-  }, [selectedHive]);
+  }, [selectedHive]); // Dependency on selectedHive ensures alerts update when hive changes
 
   const handleSendMessage = useCallback(async (
     prompt: string, 
@@ -227,6 +239,7 @@ const App: React.FC = () => {
         return;
     }
     
+    // Determine if a new chat session is needed
     const isNewConversation = options.isNewConversation || !currentHive.chat;
     const chatInstance = isNewConversation ? createChatSession() : currentHive.chat;
 
@@ -236,10 +249,13 @@ const App: React.FC = () => {
         return;
     }
     
+    // Add user message to chat history immediately
     setHivesData(prevHives => prevHives.map(hive => {
         if (hive.id === selectedHiveId) {
             const history = isNewConversation ? [] : hive.chatHistory;
-            const updatedHistory = [...history, { role: 'user' as const, content: prompt }];
+            // Ensure content is always defined for user messages
+            const userMessage: ChatMessage = { role: 'user', content: prompt }; 
+            const updatedHistory = [...history, userMessage];
             return { ...hive, chatHistory: updatedHistory, chat: chatInstance };
         }
         return hive;
@@ -250,6 +266,7 @@ const App: React.FC = () => {
     const lowerCasePrompt = prompt.toLowerCase();
     const isAnalysisRequest = analysisKeywords.some(keyword => lowerCasePrompt.includes(keyword));
 
+    // If it's an analysis request and no image is provided, augment with sensor data
     if (isAnalysisRequest && !options.image) {
         const { temperature, humidity, weight, sound } = currentHive.sensorData;
         finalPrompt = `The user asked: "${prompt}".
@@ -263,23 +280,25 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
     try {
         const response = options.image
-            ? await chatInstance.sendMessage({
-                message: [ { text: finalPrompt }, { inlineData: { data: options.image.base64, mimeType: options.image.mimeType }}]
-              })
-            : await chatInstance.sendMessage({ message: finalPrompt });
+            ? await chatInstance.sendMessage([ { text: finalPrompt }, { inlineData: { data: options.image.base64, mimeType: options.image.mimeType }}])
+            : await chatInstance.sendMessage(finalPrompt);
         
-        const modelResponse = response.text;
+        // Ensure modelResponse is always a string, even if response.text is undefined
+        const modelResponse: string = response.text || "No response from AI model."; 
         
         setHivesData(prevHives => prevHives.map(hive => {
             if (hive.id === selectedHiveId) {
-                return { ...hive, chatHistory: [...hive.chatHistory, { role: 'model', content: modelResponse }] };
+                // Cast model response to ChatMessage to match type definition
+                const aiMessage: ChatMessage = { role: 'model', content: modelResponse };
+                return { ...hive, chatHistory: [...hive.chatHistory, aiMessage] };
             }
             return hive;
         }));
 
     } catch (error) {
         console.error("Error sending chat message:", error);
-        const errorMessage = "Sorry, I couldn't get a response. The API may be unavailable or the request was blocked. Please check the console for details.";
+        // Provide a user-friendly error message, ensuring it's a string
+        const errorMessage: string = "Sorry, I couldn't get a response. The API may be unavailable or the request was blocked. Please check the console for details.";
         setHivesData(prevHives => prevHives.map(hive => 
             hive.id === selectedHiveId 
             ? { ...hive, chatHistory: [...hive.chatHistory, { role: 'model', content: errorMessage }] } 
@@ -288,7 +307,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     } finally {
         setChatLoading(false);
     }
-  }, [selectedHiveId, hivesData]);
+  }, [selectedHiveId, hivesData]); // Add hivesData to dependencies as it's used to find currentHive
 
   const handleStartImageAnalysis = useCallback(async (imageSource: string) => {
     setChatLoading(true);
@@ -298,7 +317,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
         await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
     } catch (error) {
         console.error("Error analyzing image from source:", error);
-        const errorMessage = "Sorry, I couldn't analyze that image. It might be due to a network issue or browser security policy (CORS). Try uploading an image instead.";
+        const errorMessage: string = "Sorry, I couldn't analyze that image. It might be due to a network issue or browser security policy (CORS). Try uploading an image instead.";
         setHivesData(prevHives => prevHives.map(hive => 
             hive.id === selectedHiveId 
             ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] } 
@@ -306,14 +325,16 @@ Remember to respond as Bwise, the friendly apiculturist.`;
         ));
         setChatLoading(false);
     }
-  }, [handleSendMessage, selectedHiveId]);
-  
+  }, [handleSendMessage, selectedHiveId]); // Add selectedHiveId to dependencies
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedHiveId) return;
     const file = event.target.files?.[0];
     if (file) {
         setChatLoading(true);
         const objectURL = URL.createObjectURL(file);
+        objectURLsRef.current.push(objectURL); // Store object URL for cleanup
+        
         setHivesData(hives => hives.map(h => h.id === selectedHiveId ? {...h, image: objectURL, imageTimestamp: Date.now()} : h));
         
         try {
@@ -322,23 +343,38 @@ Remember to respond as Bwise, the friendly apiculturist.`;
             await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
         } catch (error) {
             console.error("Error analyzing uploaded file:", error);
-            const errorMessage = "Sorry, something went wrong while analyzing the uploaded file.";
+            const errorMessage: string = "Sorry, something went wrong while analyzing the uploaded file.";
             setHivesData(prevHives => prevHives.map(hive => 
                 hive.id === selectedHiveId 
                 ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] } 
                 : hive
             ));
             setChatLoading(false);
+        } finally {
+            // Revoke the object URL after use, especially if you're not keeping it persistently
+            // If the image is meant to be displayed until replaced, this can be managed in a more complex way
+            // For now, it's cleaned up on component unmount via the initial useEffect, or when new file is selected.
+            // If `setHivesData` replaces `image` often, `objectURLsRef` would accumulate
+            // A better cleanup strategy might be to revoke the *previous* objectURL when a *new* one is set for a hive image.
+            // Or only revoke when the component unmounts. For simplicity, sticking with the current ref logic.
         }
     }
   };
 
+  // Cleanup for object URLs when component unmounts
+  useEffect(() => {
+    return () => {
+        objectURLsRef.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const handleHistoryClick = () => { setHistoryLoading(true); setHistoryModalOpen(true); setTimeout(() => setHistoryLoading(false), 500); };
-  const getStatusColor = (value: number, idealMin: number, idealMax: number, warnMin: number, warnMax: number): AlertType => {
+  
+  const getStatusColor = useCallback((value: number, idealMin: number, idealMax: number, warnMin: number, warnMax: number): AlertType => {
     if (value < warnMin || value > warnMax) return AlertType.CRITICAL;
     if (value < idealMin || value > idealMax) return AlertType.WARNING;
     return AlertType.OK;
-  };
+  }, []); // useCallback for memoization if this is called frequently and depends on stable references
 
   if (!selectedHive) return <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">Loading Apiary Dashboard...</div>;
   
@@ -363,8 +399,9 @@ Remember to respond as Bwise, the friendly apiculturist.`;
                         </tr>
                     </thead>
                     <tbody>
-                        {[...fullHistory].reverse().map((reading) => (
-                        <tr key={reading.timestamp} className="border-b border-gray-200 hover:bg-gray-50">
+                        {/* Ensure key is unique and stable */}
+                        {[...fullHistory].reverse().map((reading, index) => (
+                        <tr key={reading.timestamp + '-' + index} className="border-b border-gray-200 hover:bg-gray-50">
                             <td className="px-4 py-2">{new Date(reading.timestamp).toLocaleString()}</td><td className="px-4 py-2">{reading.temperature.toFixed(2)}</td><td className="px-4 py-2">{reading.humidity.toFixed(2)}</td><td className="px-4 py-2">{reading.weight.toFixed(2)}</td><td className="px-4 py-2">{reading.sound.toFixed(2)}</td>
                         </tr>
                         ))}
