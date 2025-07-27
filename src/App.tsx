@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
-import type { SensorData, Alert, HistoryEntry, WeightHistoryPoint, Hive, ChatMessage } from './types';
+import type { SensorData, Alert, HistoryEntry, WeightHistoryPoint, Hive } from './types';
 import type { Chat } from '@google/genai';
 import {
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
