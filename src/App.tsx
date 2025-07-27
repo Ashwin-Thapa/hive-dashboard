@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
 import type { SensorData, Alert, HistoryEntry, Hive, ChatMessage } from './types';
-import type { GenerateContentCandidate, GenerateContentResult } from '@google/genai'; // Import these types
-import { // ... (rest of your imports)
+import type { GenerateContentResponse } from '@google/genai'; 
+import { 
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
   HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH,
   SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_WARNING_HIGH, SOUND_CRITICAL_HIGH,
@@ -184,6 +184,9 @@ const App: React.FC = () => {
   }, []);
 
   // Real-time simulation for hives #2 through #10
+  // ... (previous code)
+
+  // Real-time simulation for hives #2 through #10
   useEffect(() => {
     const intervalId = setInterval(() => {
         setHivesData(prevHives => {
@@ -198,13 +201,21 @@ const App: React.FC = () => {
                     timestamp: newTimestamp,
                 };
                 const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData]; // Keep history trimmed
-                return { ...hive, sensorData: newSensorData, fullHistory: newFullHistory, weightHistory: newFullHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight }))};
+                return { 
+                    ...hive, 
+                    sensorData: newSensorData, 
+                    fullHistory: newFullHistory, 
+                    // CORRECTED LINE BELOW: Removed the duplicate "weight: d.timestamp"
+                    weightHistory: newFullHistory.map((d) => ({ timestamp: d.timestamp, weight: d.weight })) 
+                };
             });
         });
     }, 10000);
 
     return () => clearInterval(intervalId);
   }, []);
+
+// ... (rest of the code)
   
   const selectedHive = hivesData.find(h => h.id === selectedHiveId);
 
@@ -220,7 +231,7 @@ const App: React.FC = () => {
     if (sound < SOUND_WARNING_LOW || sound >= SOUND_CRITICAL_HIGH) newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Sound: ${sound.toFixed(2)}dB. Indicates distress.` });
     else if (sound < SOUND_IDEAL_MIN || sound > SOUND_WARNING_HIGH) newAlerts.push({ type: AlertType.WARNING, message: `Warning Sound: ${sound.toFixed(2)}dB. Unusual activity.` });
     setAlerts(newAlerts);
-  }, [selectedHive]); // Dependency on selectedHive ensures alerts update when hive changes
+  }, [selectedHive]); 
 
   const handleSendMessage = useCallback(async (
     prompt: string, 
@@ -280,7 +291,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     }
 
     try {
-        let response: GenerateContentResult; // Declare response type
+        let response: GenerateContentResponse; 
         if (options.image) {
             response = await chatInstance.sendMessage([
                 { text: finalPrompt },
@@ -290,12 +301,12 @@ Remember to respond as Bwise, the friendly apiculturist.`;
             response = await chatInstance.sendMessage(finalPrompt);
         }
         
-        // Ensure modelResponse is always a string, even if response.text is undefined
-        const modelResponse: string = response.response.text() || "No response from AI model."; // Access response.response.text()
+        // **CORRECTED:** Removed () because .text is a getter property, not a method.
+        // Optional chaining `?.` is still useful for `response` itself.
+        const modelResponse: string = response.text ?? "No response from AI model."; 
         
         setHivesData(prevHives => prevHives.map(hive => {
             if (hive.id === selectedHiveId) {
-                // Cast model response to ChatMessage to match type definition
                 const aiMessage: ChatMessage = { role: 'model', content: modelResponse };
                 return { ...hive, chatHistory: [...hive.chatHistory, aiMessage] };
             }
@@ -304,7 +315,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
     } catch (error) {
         console.error("Error sending chat message:", error);
-        // Provide a user-friendly error message, ensuring it's a string
         const errorMessage: string = "Sorry, I couldn't get a response. The API may be unavailable or the request was blocked. Please check the console for details.";
         setHivesData(prevHives => prevHives.map(hive => 
             hive.id === selectedHiveId 
@@ -314,7 +324,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     } finally {
         setChatLoading(false);
     }
-  }, [selectedHiveId, hivesData]); // Add hivesData to dependencies as it's used to find currentHive
+  }, [selectedHiveId, hivesData]); 
 
   const handleStartImageAnalysis = useCallback(async (imageSource: string) => {
     setChatLoading(true);
@@ -332,7 +342,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
         ));
         setChatLoading(false);
     }
-  }, [handleSendMessage, selectedHiveId]); // Add selectedHiveId to dependencies
+  }, [handleSendMessage, selectedHiveId]); 
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedHiveId) return;
@@ -340,7 +350,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     if (file) {
         setChatLoading(true);
         const objectURL = URL.createObjectURL(file);
-        objectURLsRef.current.push(objectURL); // Store object URL for cleanup
+        objectURLsRef.current.push(objectURL); 
         
         setHivesData(hives => hives.map(h => h.id === selectedHiveId ? {...h, image: objectURL, imageTimestamp: Date.now()} : h));
         
@@ -358,17 +368,11 @@ Remember to respond as Bwise, the friendly apiculturist.`;
             ));
             setChatLoading(false);
         } finally {
-            // Revoke the object URL after use, especially if you're not keeping it persistently
-            // If the image is meant to be displayed until replaced, this can be managed in a more complex way
-            // For now, it's cleaned up on component unmount via the initial useEffect, or when new file is selected.
-            // If `setHivesData` replaces `image` often, `objectURLsRef` would accumulate
-            // A better cleanup strategy might be to revoke the *previous* objectURL when a *new* one is set for a hive image.
-            // Or only revoke when the component unmounts. For simplicity, sticking with the current ref logic.
+            // Cleanup logic as discussed previously
         }
     }
   };
 
-  // Cleanup for object URLs when component unmounts
   useEffect(() => {
     return () => {
         objectURLsRef.current.forEach(url => URL.revokeObjectURL(url));
@@ -381,7 +385,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     if (value < warnMin || value > warnMax) return AlertType.CRITICAL;
     if (value < idealMin || value > idealMax) return AlertType.WARNING;
     return AlertType.OK;
-  }, []); // useCallback for memoization if this is called frequently and depends on stable references
+  }, []); 
 
   if (!selectedHive) return <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">Loading Apiary Dashboard...</div>;
   
