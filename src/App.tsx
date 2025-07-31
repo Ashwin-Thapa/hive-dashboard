@@ -55,21 +55,38 @@ const generateRandomWeight = (min: number, max: number): number => {
   return min + (Math.random() * (max - min));
 };
 
-// Helper function to scale raw weight (KEEPING ORIGINAL LOGIC FOR 'bwise-1' IF RAW WEIGHT IS NOT DIRECTLY GRAMS)
-// If your Firebase 'rawWeight' is already in grams and you just want to ensure it's within a range,
-// this function's logic might need adjustment based on the *actual* raw data.
-// For now, I'll keep the original scaling but ensure it can produce decimals.
+// **UPDATED scaleWeight function to directly apply rawWeight to a random base**
 const scaleWeight = (rawWeight: number): number => {
-  let scaledWeight: number;
-  if (rawWeight < 0) {
-    scaledWeight = 23000; // fallback for invalid data, in grams
-  } else if (rawWeight <= 10) {
-    // This calculation already produces decimals if rawWeight is not an integer.
-    scaledWeight = 23000 + (rawWeight / 10) * 2000; // Map 0–10 → 23000–25000 grams
+  // Generate a random number always between 23000 and 25000 (as per your request)
+  const randomNumberBase = generateRandomWeight(23000, 25000);
+
+  let finalGramWeight: number;
+
+  if (rawWeight >= 0) {
+    // If rawWeight is positive or zero, subtract it from the random number
+    finalGramWeight = randomNumberBase - rawWeight;
   } else {
-    scaledWeight = 25000; // anything higher clamps to max, in grams
+    // If rawWeight is negative, add it to the random number
+    // (Adding a negative number is equivalent to subtracting its absolute value)
+    finalGramWeight = randomNumberBase + rawWeight;
   }
-  return scaledWeight;
+
+  // IMPORTANT NOTE:
+  // As per your instruction "Do not use any max or min number",
+  // this function does NOT clamp the 'rawWeight' input nor the 'finalGramWeight' output.
+  //
+  // This means:
+  // 1. If 'rawWeight' from Firebase is very large (e.g., +1000) or very small (e.g., -1000),
+  //    the 'finalGramWeight' could fall significantly outside the 23000-25000 range.
+  //    For instance, if randomNumberBase is 23000 and rawWeight is 500, finalGramWeight = 22500.
+  //    If randomNumberBase is 23000 and rawWeight is -500, finalGramWeight = 22500.
+  // 2. The charts and displays will show these potentially out-of-range values.
+  //
+  // If you later decide you *do* need to keep the final displayed weight strictly within
+  // the 23000-25000 range, you would re-add this line at the end of the function:
+  // return Math.min(Math.max(finalGramWeight, 23000), 25000);
+
+  return finalGramWeight;
 };
 
 
@@ -107,19 +124,21 @@ const App: React.FC = () => {
       let currentWeight: number;
 
       if (isHive1) {
-        // For bwise-1, simulate history with scaled random data
+        // For bwise-1, simulate history with scaled random data.
+        // For initial history, we'll simulate raw values, then scale them.
         for (let i = 20; i > 0; i--) {
+          const simulatedRawWeight = generateRandomWeight(-200, 200); // Simulate some raw input
           fullHistory.push({
             timestamp: now - i * 60000 * 15,
             temperature: 34 + (Math.random() - 0.5) * 4,
             humidity: 55 + Math.random() * 25,
-            weight: scaleWeight(Math.random() * 10), // Still use scaleWeight for bwise-1 initial history
+            weight: scaleWeight(simulatedRawWeight), // Use scaleWeight for bwise-1 initial history
             sound: 50 + Math.random() * 20,
           });
         }
         currentWeight = fullHistory[fullHistory.length - 1].weight; // Last history point
       } else {
-        // For other hives, generate truly random decimals between 23000 and 25000
+        // For other hives, generate truly random decimals between 23000 and 25000 (as before)
         currentWeight = generateRandomWeight(23000, 25000);
         for (let i = 20; i > 0; i--) {
           currentWeight = generateRandomWeight(23000, 25000); // Simulate random historical weights
@@ -162,11 +181,11 @@ const App: React.FC = () => {
         const data = snapshot.val();
         setHivesData(prev => prev.map(hive => {
           if (hive.id === hive1Id) {
-            const rawWeight = data.weight || 0;
+            const rawWeight = data.weight || 0; // Get raw weight from Firebase
             const newSensorData: SensorData = {
               temperature: data.temperature || 0,
               humidity: data.humidity || 0,
-              weight: scaleWeight(rawWeight), // Use scaled weight (which can have decimals)
+              weight: scaleWeight(rawWeight), // Use the new scaleWeight function
               sound: data.sound_dB || 0,
               timestamp: data.timestamp * 1000,
             };
@@ -195,7 +214,7 @@ const App: React.FC = () => {
         const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
           temperature: reading.temperature || 0,
           humidity: reading.humidity || 0,
-          weight: scaleWeight(reading.weight || 0), // Scale historical weight data (can have decimals)
+          weight: scaleWeight(reading.weight || 0), // Use the new scaleWeight for historical data too
           sound: reading.sound_dB || 0,
           timestamp: reading.timestamp * 1000,
         }));
@@ -301,7 +320,7 @@ const App: React.FC = () => {
 Please provide an analysis based on the following real-time data for the hive named "${currentHive.name}":
 - Temperature: ${temperature.toFixed(2)}°C
 - Humidity: ${humidity.toFixed(2)}%
-- Weight: ${weight} grams // REMOVED toFixed(2)
+- Weight: ${weight} grams
 - Sound Level: ${sound.toFixed(2)} dB
 Remember to respond as Bwise, the friendly apiculturist.`;
     }
@@ -434,7 +453,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
                     <td className="px-4 py-2">{new Date(reading.timestamp).toLocaleString()}</td>
                     <td className="px-4 py-2">{reading.temperature.toFixed(2)}</td>
                     <td className="px-4 py-2">{reading.humidity.toFixed(2)}</td>
-                    <td className="px-4 py-2">{reading.weight}</td> {/* REMOVED toFixed(2) */}
+                    <td className="px-4 py-2">{reading.weight}</td>
                     <td className="px-4 py-2">{reading.sound.toFixed(2)}</td>
                   </tr>
                 ))}
