@@ -19,17 +19,19 @@ const WeightHistoryChart: React.FC<WeightHistoryChartProps> = ({ data }) => {
   const weights = data.map(p => p.weight);
   const minWeight = Math.min(...weights);
   const maxWeight = Math.max(...weights);
-  
-  // Pad the data range by 5kg on both sides to ensure context
+
+  // Pad the data range by 5000 grams on both sides to ensure context
+  // This padding still uses 5000g, which is a good round number for axis readability.
   const paddedMin = Math.max(0, minWeight - 5000);
   const paddedMax = maxWeight + 5000;
-  
-  // Calculate a sensible Y-axis domain, rounding to the nearest 5kg (5000g)
+
+  // Calculate a sensible Y-axis domain, rounding to the nearest 5000 grams (for cleaner ticks)
+  // The actual data points will still show full decimals.
   const yDomainMin = Math.floor(paddedMin / 5000) * 5000;
   const yDomainMax = Math.ceil(paddedMax / 5000) * 5000;
 
-  // Generate ticks with 5kg (5000g) increments for the Y-axis.
-  const yTicks = [];
+  // Generate ticks with 5000 grams increments for the Y-axis.
+  const yTicks: number[] = [];
   for (let i = yDomainMin; i <= yDomainMax; i += 5000) {
       yTicks.push(i);
   }
@@ -53,13 +55,13 @@ const WeightHistoryChart: React.FC<WeightHistoryChartProps> = ({ data }) => {
           stroke="#6b7280"
           domain={[yDomainMin, yDomainMax]}
           ticks={yTicks}
-          tickFormatter={(value) => `${value / 1000} kg`}
+          tickFormatter={(value) => `${value} g`} // REMOVED toFixed() - shows raw value
           width={80}
         />
         <Tooltip
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}
           labelFormatter={(unixTime) => new Date(unixTime).toLocaleString()}
-          formatter={(value: number) => [`${(value / 1000).toFixed(2)} kg`, 'Weight']}
+          formatter={(value: number) => [`${value} g`, 'Weight']} // REMOVED toFixed() - shows raw value
         />
         <Line type="monotone" name="Weight" dataKey="weight" stroke={COLORS.PRIMARY} strokeWidth={2} dot={false} activeDot={{ r: 8 }} />
       </LineChart>
