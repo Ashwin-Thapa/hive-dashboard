@@ -482,7 +482,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
             <div className="lg:col-span-3 bg-white rounded-xl p-4 shadow-md flex flex-col"><AlertsCard alerts={alerts} /></div>
 
-            <div className="lg:col-span-1 bg-white rounded-xl p-4 shadow-md flex flex-col">
+            {/* <div className="lg:col-span-1 bg-white rounded-xl p-4 shadow-md flex flex-col">
               <h3 className="text-lg font-bold text-gray-900 mb-2">Hive Image</h3>
               <img src={image} alt="Hive Snapshot" className="rounded-md aspect-[4/3] object-cover cursor-pointer hover:ring-2 hover:ring-bwise-yellow transition-all" onClick={() => setImageModalOpen(true)} />
               {imageTimestamp && (
@@ -495,7 +495,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
                 <button onClick={() => handleStartImageAnalysis(image)} disabled={isChatLoading} className="w-full text-sm flex-1 bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors">Analyze This Image</button>
                 <button onClick={() => fileInputRef.current?.click()} disabled={isChatLoading} className="w-full text-sm flex-1 bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors">Upload & Analyze</button>
               </div>
-            </div>
+            </div> */}
 
             <div className="lg:col-span-2 bg-white rounded-xl p-4 shadow-md flex flex-col">
               <ChatInterface
