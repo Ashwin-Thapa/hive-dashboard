@@ -19,36 +19,37 @@ import HiveSelector from './components/HiveSelector';
 import LiveInfo from './components/LiveInfo';
 import ChatInterface from './components/ChatInterface';
 
-const fileToBase64 = (file: File): Promise<{ base64: string, mimeType: string }> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1];
-      resolve({ base64, mimeType: file.type });
-    };
-    reader.onerror = error => reject(error);
-  });
-};
+// These functions are no longer needed
+// const fileToBase64 = (file: File): Promise<{ base64: string, mimeType: string }> => {
+//   return new Promise((resolve, reject) => {
+//     const reader = new FileReader();
+//     reader.readAsDataURL(file);
+//     reader.onload = () => {
+//       const result = reader.result as string;
+//       const base64 = result.split(',')[1];
+//       resolve({ base64, mimeType: file.type });
+//     };
+//     reader.onerror = error => reject(error);
+//   });
+// };
 
-const urlToBase64 = async (url: string): Promise<{ base64: string, mimeType: string }> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image. Status: ${response.status} ${response.statusText}`);
-  }
-  const blob = await response.blob();
-  const reader = new FileReader();
-  return new Promise((resolve, reject) => {
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1];
-      resolve({ base64, mimeType: blob.type });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
+// const urlToBase64 = async (url: string): Promise<{ base64: string, mimeType: string }> => {
+//   const response = await fetch(url);
+//   if (!response.ok) {
+//     throw new Error(`Failed to fetch image. Status: ${response.status} ${response.statusText}`);
+//   }
+//   const blob = await response.blob();
+//   const reader = new FileReader();
+//   return new Promise((resolve, reject) => {
+//     reader.onloadend = () => {
+//       const result = reader.result as string;
+//       const base64 = result.split(',')[1];
+//       resolve({ base64, mimeType: blob.type });
+//     };
+//     reader.onerror = reject;
+//     reader.readAsDataURL(blob);
+//   });
+// };
 
 // Helper function to generate a random decimal weight within a range
 const generateRandomWeight = (min: number, max: number): number => {
@@ -77,9 +78,9 @@ const scaleWeight = (rawWeight: number): number => {
   //
   // This means:
   // 1. If 'rawWeight' from Firebase is very large (e.g., +1000) or very small (e.g., -1000),
-  //    the 'finalGramWeight' could fall significantly outside the 23000-25000 range.
-  //    For instance, if randomNumberBase is 23000 and rawWeight is 500, finalGramWeight = 22500.
-  //    If randomNumberBase is 23000 and rawWeight is -500, finalGramWeight = 22500.
+  //     the 'finalGramWeight' could fall significantly outside the 23000-25000 range.
+  //     For instance, if randomNumberBase is 23000 and rawWeight is 500, finalGramWeight = 22500.
+  //     If randomNumberBase is 23000 and rawWeight is -500, finalGramWeight = 22500.
   // 2. The charts and displays will show these potentially out-of-range values.
   //
   // If you later decide you *do* need to keep the final displayed weight strictly within
@@ -96,27 +97,27 @@ const App: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isHistoryModalOpen, setHistoryModalOpen] = useState(false);
-  const [isImageModalOpen, setImageModalOpen] = useState(false);
+  // const [isImageModalOpen, setImageModalOpen] = useState(false); // Comment this line out
   const [isHistoryLoading, setHistoryLoading] = useState(false);
   const [isChatLoading, setChatLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // const fileInputRef = useRef<HTMLInputElement>(null); // Comment this line out
   const objectURLsRef = useRef<string[]>([]); // To keep track of created object URLs for cleanup
 
   useEffect(() => {
     const initialHives: Hive[] = [];
     const now = Date.now();
-    const imageUrls = [
-      'https://res.cloudinary.com/ddmsvxkdm/image/upload/v1753255472/wd3dapnnr3tco86udik5.jpg',
-      'https://images.unsplash.com/photo-1616012797256-07e43684279a?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1587770853995-d72b434a4577?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1542155651-209045711624?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1588675646184-f5b2a4579212?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1590112192144-ed8407a56110?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1601612745779-9b2f693b8608?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1580373315357-ac88351b01a2?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1516044733470-428654c619b9?q=80&w=800&h=600&fit=crop&crop=entropy',
-      'https://images.unsplash.com/photo-1627961224352-857c0973e734?q=80&w=800&h=600&fit=crop&crop=entropy'
-    ];
+    // const imageUrls = [ // Comment this entire array out
+    //   'https://res.cloudinary.com/ddmsvxkdm/image/upload/v1753255472/wd3dapnnr3tco86udik5.jpg',
+    //   'https://images.unsplash.com/photo-1616012797256-07e43684279a?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1587770853995-d72b434a4577?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1542155651-209045711624?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1588675646184-f5b2a4579212?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1590112192144-ed8407a56110?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1601612745779-9b2f693b8608?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1580373315357-ac88351b01a2?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1516044733470-428654c619b9?q=80&w=800&h=600&fit=crop&crop=entropy',
+    //   'https://images.unsplash.com/photo-1627961224352-857c0973e734?q=80&w=800&h=600&fit=crop&crop=entropy'
+    // ];
 
     for (let j = 1; j <= 10; j++) {
       const isHive1 = j === 1;
@@ -158,8 +159,8 @@ const App: React.FC = () => {
         sensorData: fullHistory[fullHistory.length - 1], // Last entry is current data
         fullHistory: fullHistory,
         weightHistory: fullHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-        image: imageUrls[j - 1],
-        imageTimestamp: now - Math.floor(Math.random() * 24 * 60 * 60 * 1000 * 3),
+        // image: imageUrls[j - 1], // Comment this line out
+        // imageTimestamp: now - Math.floor(Math.random() * 24 * 60 * 60 * 1000 * 3), // Comment this line out
         chat: createChatSession(),
         chatHistory: [],
       });
@@ -314,6 +315,7 @@ const App: React.FC = () => {
     const lowerCasePrompt = prompt.toLowerCase();
     const isAnalysisRequest = analysisKeywords.some(keyword => lowerCasePrompt.includes(keyword));
 
+    // The logic below for `isAnalysisRequest` is fine to keep, as it only uses sensor data.
     if (isAnalysisRequest && !options.image) {
       const { temperature, humidity, weight, sound } = currentHive.sensorData;
       finalPrompt = `The user asked: "${prompt}".
@@ -362,53 +364,55 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     }
   }, [selectedHiveId, hivesData]);
 
-  const handleStartImageAnalysis = useCallback(async (imageSource: string) => {
-    setChatLoading(true);
-    try {
-      const { base64, mimeType } = await urlToBase64(imageSource);
-      const prompt = "Analyze this hive image for me.";
-      await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
-    } catch (error) {
-      console.error("Error analyzing image from source:", error);
-      const errorMessage: string = "Sorry, I couldn't analyze that image. It might be due to a network issue or browser security policy (CORS). Try uploading an image instead.";
-      setHivesData(prevHives => prevHives.map(hive =>
-        hive.id === selectedHiveId
-          ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
-          : hive
-      ));
-      setChatLoading(false);
-    }
-  }, [handleSendMessage, selectedHiveId]);
+  // Comment out or delete this entire function
+  // const handleStartImageAnalysis = useCallback(async (imageSource: string) => {
+  //   setChatLoading(true);
+  //   try {
+  //     const { base64, mimeType } = await urlToBase64(imageSource);
+  //     const prompt = "Analyze this hive image for me.";
+  //     await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
+  //   } catch (error) {
+  //     console.error("Error analyzing image from source:", error);
+  //     const errorMessage: string = "Sorry, I couldn't analyze that image. It might be due to a network issue or browser security policy (CORS). Try uploading an image instead.";
+  //     setHivesData(prevHives => prevHives.map(hive =>
+  //       hive.id === selectedHiveId
+  //         ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
+  //         : hive
+  //     ));
+  //     setChatLoading(false);
+  //   }
+  // }, [handleSendMessage, selectedHiveId]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedHiveId) return;
-    const file = event.target.files?.[0];
+  // Comment out or delete this entire function
+  // const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (!selectedHiveId) return;
+  //   const file = event.target.files?.[0];
 
-    if (file) {
-      setChatLoading(true);
-      const objectURL = URL.createObjectURL(file);
-      objectURLsRef.current.push(objectURL);
+  //   if (file) {
+  //     setChatLoading(true);
+  //     const objectURL = URL.createObjectURL(file);
+  //     objectURLsRef.current.push(objectURL);
 
-      setHivesData(hives => hives.map(h => h.id === selectedHiveId ? { ...h, image: objectURL, imageTimestamp: Date.now() } : h));
+  //     setHivesData(hives => hives.map(h => h.id === selectedHiveId ? { ...h, image: objectURL, imageTimestamp: Date.now() } : h));
 
-      try {
-        const { base64, mimeType } = await fileToBase64(file);
-        const prompt = "Analyze this image I've uploaded.";
-        await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
-      } catch (error) {
-        console.error("Error analyzing uploaded file:", error);
-        const errorMessage: string = "Sorry, something went wrong while analyzing the uploaded file.";
-        setHivesData(prevHives => prevHives.map(hive =>
-          hive.id === selectedHiveId
-            ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
-            : hive
-        ));
-        setChatLoading(false);
-      } finally {
-        // No specific action needed here as chatLoading is handled in try/catch
-      }
-    }
-  };
+  //     try {
+  //       const { base64, mimeType } = await fileToBase64(file);
+  //       const prompt = "Analyze this image I've uploaded.";
+  //       await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
+  //     } catch (error) {
+  //       console.error("Error analyzing uploaded file:", error);
+  //       const errorMessage: string = "Sorry, something went wrong while analyzing the uploaded file.";
+  //       setHivesData(prevHives => prevHives.map(hive =>
+  //         hive.id === selectedHiveId
+  //           ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
+  //           : hive
+  //       ));
+  //       setChatLoading(false);
+  //     } finally {
+  //       // No specific action needed here as chatLoading is handled in try/catch
+  //     }
+  //   }
+  // };
 
   useEffect(() => {
     return () => {
@@ -426,16 +430,18 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
   if (!selectedHive) return <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">Loading Apiary Dashboard...</div>;
 
-  const { sensorData, weightHistory, fullHistory, image, imageTimestamp, chatHistory } = selectedHive;
+  // Change the destructuring to remove image variables
+  const { sensorData, weightHistory, fullHistory, chatHistory } = selectedHive;
   const tempStatus = getStatusColor(sensorData.temperature, TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH);
   const humidityStatus = getStatusColor(sensorData.humidity, HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH);
   const soundStatus = getStatusColor(sensorData.sound, SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_CRITICAL_HIGH);
 
   return (
     <>
-      <Modal isOpen={isImageModalOpen} onClose={() => setImageModalOpen(false)} title="Latest Hive Image">
+      {/* Remove the image modal component */}
+      {/* <Modal isOpen={isImageModalOpen} onClose={() => setImageModalOpen(false)} title="Latest Hive Image">
         <img src={image} alt="Full view of the hive" className="w-full h-auto rounded-lg" />
-      </Modal>
+      </Modal> */}
 
       <Modal isOpen={isHistoryModalOpen} onClose={() => setHistoryModalOpen(false)} title={`Recent History for ${selectedHive.name} (Last 100 Records)`}>
         {isHistoryLoading ? <p>Loading history...</p> : (
@@ -482,6 +488,7 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
             <div className="lg:col-span-3 bg-white rounded-xl p-4 shadow-md flex flex-col"><AlertsCard alerts={alerts} /></div>
 
+            {/* Remove this entire div, which contains the image display and upload buttons */}
             {/* <div className="lg:col-span-1 bg-white rounded-xl p-4 shadow-md flex flex-col">
               <h3 className="text-lg font-bold text-gray-900 mb-2">Hive Image</h3>
               <img src={image} alt="Hive Snapshot" className="rounded-md aspect-[4/3] object-cover cursor-pointer hover:ring-2 hover:ring-bwise-yellow transition-all" onClick={() => setImageModalOpen(true)} />

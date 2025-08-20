@@ -1,5 +1,5 @@
 // src/types.ts
-import type { Chat } from '@google/genai'; // <--- KEEP THIS LINE (Crucial for Hive type)
+import type { Chat } from '@google/genai';
 
 export enum AlertType {
   OK = 'ok',
@@ -39,8 +39,6 @@ export type Hive = {
   sensorData: SensorData;
   fullHistory: HistoryEntry[];
   weightHistory: WeightHistoryPoint[];
-  image: string; // URL of the hive image
-  imageTimestamp: number | null; // Timestamp when the image was captured
   chat: Chat | null; // Gemini ChatSession instance
   chatHistory: ChatMessage[];
 };
