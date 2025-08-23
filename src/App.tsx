@@ -228,6 +228,9 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
       }
       return hive;
     }));
+    if (selectedHiveId === hive2Id) {
+        setLastUpdated(new Date(data.timestamp * 1000));
+      }
   }
 });
 
@@ -274,7 +277,7 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
     console.error("Error fetching beehive2 history:", error);
   });
     return () => { unsubscribeCurrent(); unsubscribeImage(); unsubscribeCurrent2(); };
-  }, []);
+  }, [selectedHiveId]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
