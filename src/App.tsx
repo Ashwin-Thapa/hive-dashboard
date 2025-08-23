@@ -175,6 +175,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const hive1Id = 'bwise-1';
+    const hive2Id = 'bwise-2';
+
     const currentDbRef = ref(db, 'beehive');
 
     const unsubscribeCurrent = onValue(currentDbRef, (snapshot) => {
@@ -198,6 +200,36 @@ const App: React.FC = () => {
         setLastUpdated(new Date(data.timestamp * 1000));
       }
     });
+
+    // Listener for Hive #2
+const currentDbRef2 = ref(db, 'beehive2');
+const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    setHivesData(prev => prev.map(hive => {
+      if (hive.id === hive2Id) { // Use 'bwise-2' instead of hive2Id for clarity
+        // Changed code starts here
+        const newSensorData: SensorData = {
+          temperature: data.temperature || 0,
+          humidity: data.humidity || 0,
+          weight: data.weight || 0, // This line now uses the raw weight
+          sound: data.sound_dB || 0,
+          timestamp: data.timestamp * 1000,
+        };
+        // Changed code ends here
+        const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+        return { 
+          ...hive, 
+          sensorData: newSensorData, 
+          fullHistory: updatedHistory, 
+          weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })), 
+          lastUpdatedTimestamp: data.timestamp * 1000 
+        };
+      }
+      return hive;
+    }));
+  }
+});
 
     const imageDbRef = ref(db, 'bwise_images/latest');
     const unsubscribeImage = onValue(imageDbRef, (snapshot) => {
@@ -225,7 +257,23 @@ const App: React.FC = () => {
       console.error("Error fetching beehive history:", error);
     });
 
-    return () => { unsubscribeCurrent(); unsubscribeImage(); };
+  const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
+  get(historyQuery2).then((snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
+        temperature: reading.temperature || 0,
+        humidity: reading.humidity || 0,
+        weight: reading.weight || 0, // This history uses raw weight from Firebase
+        sound: reading.sound_dB || 0,
+        timestamp: reading.timestamp * 1000,
+      }));
+      setHivesData(prev => prev.map(hive => hive.id === hive2Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
+    }
+  }).catch(error => {
+    console.error("Error fetching beehive2 history:", error);
+  });
+    return () => { unsubscribeCurrent(); unsubscribeImage(); unsubscribeCurrent2(); };
   }, []);
 
   useEffect(() => {
@@ -233,7 +281,7 @@ const App: React.FC = () => {
       setHivesData(prevHives => {
         const newTimestamp = Date.now();
         return prevHives.map(hive => {
-          if (hive.id === 'bwise-1') return hive; // Hive 1 is handled by Firebase and scaled weight
+          if (hive.id === 'bwise-1' || hive.id === 'bwise-2') return hive; // Hive 1 is handled by Firebase and scaled weight
           const newSensorData: SensorData = {
             temperature: hive.sensorData.temperature + (Math.random() - 0.5) * 0.2,
             humidity: hive.sensorData.humidity + (Math.random() - 0.5) * 2,
