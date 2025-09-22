@@ -19,77 +19,20 @@ import HiveSelector from './components/HiveSelector';
 import LiveInfo from './components/LiveInfo';
 import ChatInterface from './components/ChatInterface';
 
-// These functions are no longer needed
-// const fileToBase64 = (file: File): Promise<{ base64: string, mimeType: string }> => {
-//   return new Promise((resolve, reject) => {
-//     const reader = new FileReader();
-//     reader.readAsDataURL(file);
-//     reader.onload = () => {
-//       const result = reader.result as string;
-//       const base64 = result.split(',')[1];
-//       resolve({ base64, mimeType: file.type });
-//     };
-//     reader.onerror = error => reject(error);
-//   });
-// };
-
-// const urlToBase64 = async (url: string): Promise<{ base64: string, mimeType: string }> => {
-//   const response = await fetch(url);
-//   if (!response.ok) {
-//     throw new Error(`Failed to fetch image. Status: ${response.status} ${response.statusText}`);
-//   }
-//   const blob = await response.blob();
-//   const reader = new FileReader();
-//   return new Promise((resolve, reject) => {
-//     reader.onloadend = () => {
-//       const result = reader.result as string;
-//       const base64 = result.split(',')[1];
-//       resolve({ base64, mimeType: blob.type });
-//     };
-//     reader.onerror = reject;
-//     reader.readAsDataURL(blob);
-//   });
-// };
-
-// Helper function to generate a random decimal weight within a range
 const generateRandomWeight = (min: number, max: number): number => {
   return min + (Math.random() * (max - min));
 };
 
-// **UPDATED scaleWeight function to directly apply rawWeight to a random base**
 const scaleWeight = (rawWeight: number): number => {
-  // Generate a random number always between 23000 and 25000 (as per your request)
   const randomNumberBase = generateRandomWeight(23000, 25000);
-
   let finalGramWeight: number;
-
   if (rawWeight >= 0) {
-    // If rawWeight is positive or zero, subtract it from the random number
     finalGramWeight = randomNumberBase - rawWeight;
   } else {
-    // If rawWeight is negative, add it to the random number
-    // (Adding a negative number is equivalent to subtracting its absolute value)
     finalGramWeight = randomNumberBase + rawWeight;
   }
-
-  // IMPORTANT NOTE:
-  // As per your instruction "Do not use any max or min number",
-  // this function does NOT clamp the 'rawWeight' input nor the 'finalGramWeight' output.
-  //
-  // This means:
-  // 1. If 'rawWeight' from Firebase is very large (e.g., +1000) or very small (e.g., -1000),
-  //     the 'finalGramWeight' could fall significantly outside the 23000-25000 range.
-  //     For instance, if randomNumberBase is 23000 and rawWeight is 500, finalGramWeight = 22500.
-  //     If randomNumberBase is 23000 and rawWeight is -500, finalGramWeight = 22500.
-  // 2. The charts and displays will show these potentially out-of-range values.
-  //
-  // If you later decide you *do* need to keep the final displayed weight strictly within
-  // the 23000-25000 range, you would re-add this line at the end of the function:
-  // return Math.min(Math.max(finalGramWeight, 23000), 25000);
-
   return finalGramWeight;
 };
-
 
 const App: React.FC = () => {
   const [hivesData, setHivesData] = useState<Hive[]>([]);
@@ -97,27 +40,13 @@ const App: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isHistoryModalOpen, setHistoryModalOpen] = useState(false);
-  // const [isImageModalOpen, setImageModalOpen] = useState(false); // Comment this line out
   const [isHistoryLoading, setHistoryLoading] = useState(false);
   const [isChatLoading, setChatLoading] = useState(false);
-  // const fileInputRef = useRef<HTMLInputElement>(null); // Comment this line out
-  const objectURLsRef = useRef<string[]>([]); // To keep track of created object URLs for cleanup
+  const objectURLsRef = useRef<string[]>([]);
 
   useEffect(() => {
     const initialHives: Hive[] = [];
     const now = Date.now();
-    // const imageUrls = [ // Comment this entire array out
-    //   'https://res.cloudinary.com/ddmsvxkdm/image/upload/v1753255472/wd3dapnnr3tco86udik5.jpg',
-    //   'https://images.unsplash.com/photo-1616012797256-07e43684279a?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1587770853995-d72b434a4577?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1542155651-209045711624?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1588675646184-f5b2a4579212?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1590112192144-ed8407a56110?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1601612745779-9b2f693b8608?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1580373315357-ac88351b01a2?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1516044733470-428654c619b9?q=80&w=800&h=600&fit=crop&crop=entropy',
-    //   'https://images.unsplash.com/photo-1627961224352-857c0973e734?q=80&w=800&h=600&fit=crop&crop=entropy'
-    // ];
 
     for (let j = 1; j <= 10; j++) {
       const isHive1 = j === 1;
@@ -125,24 +54,21 @@ const App: React.FC = () => {
       let currentWeight: number;
 
       if (isHive1) {
-        // For bwise-1, simulate history with scaled random data.
-        // For initial history, we'll simulate raw values, then scale them.
         for (let i = 20; i > 0; i--) {
-          const simulatedRawWeight = generateRandomWeight(-200, 200); // Simulate some raw input
+          const simulatedRawWeight = generateRandomWeight(-200, 200);
           fullHistory.push({
             timestamp: now - i * 60000 * 15,
             temperature: 34 + (Math.random() - 0.5) * 4,
             humidity: 55 + Math.random() * 25,
-            weight: scaleWeight(simulatedRawWeight), // Use scaleWeight for bwise-1 initial history
+            weight: scaleWeight(simulatedRawWeight),
             sound: 50 + Math.random() * 20,
           });
         }
-        currentWeight = fullHistory[fullHistory.length - 1].weight; // Last history point
+        currentWeight = fullHistory[fullHistory.length - 1].weight;
       } else {
-        // For other hives, generate truly random decimals between 23000 and 25000 (as before)
         currentWeight = generateRandomWeight(23000, 25000);
         for (let i = 20; i > 0; i--) {
-          currentWeight = generateRandomWeight(23000, 25000); // Simulate random historical weights
+          currentWeight = generateRandomWeight(23000, 25000);
           fullHistory.push({
             timestamp: now - i * 60000 * 15,
             temperature: 34 + (Math.random() - 0.5) * 4,
@@ -156,11 +82,9 @@ const App: React.FC = () => {
       initialHives.push({
         id: `bwise-${j}`,
         name: `Bwise Hive #${j}`,
-        sensorData: fullHistory[fullHistory.length - 1], // Last entry is current data
+        sensorData: fullHistory[fullHistory.length - 1],
         fullHistory: fullHistory,
         weightHistory: fullHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-        // image: imageUrls[j - 1], // Comment this line out
-        // imageTimestamp: now - Math.floor(Math.random() * 24 * 60 * 60 * 1000 * 3), // Comment this line out
         chat: createChatSession(),
         chatHistory: [],
       });
@@ -176,19 +100,19 @@ const App: React.FC = () => {
   useEffect(() => {
     const hive1Id = 'bwise-1';
     const hive2Id = 'bwise-2';
+    const hive3Id = 'bwise-3';
 
     const currentDbRef = ref(db, 'beehive');
-
     const unsubscribeCurrent = onValue(currentDbRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         setHivesData(prev => prev.map(hive => {
           if (hive.id === hive1Id) {
-            const rawWeight = data.weight || 0; // Get raw weight from Firebase
+            const rawWeight = data.weight || 0;
             const newSensorData: SensorData = {
               temperature: data.temperature || 0,
               humidity: data.humidity || 0,
-              weight: scaleWeight(rawWeight), // Use the new scaleWeight function
+              weight: scaleWeight(rawWeight),
               sound: data.sound_dB || 0,
               timestamp: data.timestamp * 1000,
             };
@@ -201,38 +125,65 @@ const App: React.FC = () => {
       }
     });
 
-    // Listener for Hive #2
-const currentDbRef2 = ref(db, 'beehive2');
-const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
-  if (snapshot.exists()) {
-    const data = snapshot.val();
-    setHivesData(prev => prev.map(hive => {
-      if (hive.id === hive2Id) { // Use 'bwise-2' instead of hive2Id for clarity
-        // Changed code starts here
-        const newSensorData: SensorData = {
-          temperature: data.temperature || 0,
-          humidity: data.humidity || 0,
-          weight: data.weight || 0, // This line now uses the raw weight
-          sound: data.sound_dB || 0,
-          timestamp: data.timestamp * 1000,
-        };
-        // Changed code ends here
-        const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-        return { 
-          ...hive, 
-          sensorData: newSensorData, 
-          fullHistory: updatedHistory, 
-          weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })), 
-          lastUpdatedTimestamp: data.timestamp * 1000 
-        };
+    const currentDbRef2 = ref(db, 'beehive2');
+    const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setHivesData(prev => prev.map(hive => {
+          if (hive.id === hive2Id) {
+            const newSensorData: SensorData = {
+              temperature: data.temperature || 0,
+              humidity: data.humidity || 0,
+              weight: data.weight || 0,
+              sound: data.sound_dB || 0,
+              timestamp: data.timestamp * 1000,
+            };
+            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+            return {
+              ...hive,
+              sensorData: newSensorData,
+              fullHistory: updatedHistory,
+              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
+              lastUpdatedTimestamp: data.timestamp * 1000
+            };
+          }
+          return hive;
+        }));
+        if (selectedHiveId === hive2Id) {
+          setLastUpdated(new Date(data.timestamp * 1000));
+        }
       }
-      return hive;
-    }));
-    if (selectedHiveId === hive2Id) {
-        setLastUpdated(new Date(data.timestamp * 1000));
+    });
+
+    const currentDbRef3 = ref(db, 'beehive3');
+    const unsubscribeCurrent3 = onValue(currentDbRef3, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setHivesData(prev => prev.map(hive => {
+          if (hive.id === hive3Id) {
+            const newSensorData: SensorData = {
+              temperature: data.temperature || 0,
+              humidity: data.humidity || 0,
+              weight: data.weight || 0,
+              sound: data.sound_dB || 0,
+              timestamp: data.timestamp * 1000,
+            };
+            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+            return {
+              ...hive,
+              sensorData: newSensorData,
+              fullHistory: updatedHistory,
+              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
+              lastUpdatedTimestamp: data.timestamp * 1000
+            };
+          }
+          return hive;
+        }));
+        if (selectedHiveId === hive3Id) {
+          setLastUpdated(new Date(data.timestamp * 1000));
+        }
       }
-  }
-});
+    });
 
     const imageDbRef = ref(db, 'bwise_images/latest');
     const unsubscribeImage = onValue(imageDbRef, (snapshot) => {
@@ -250,7 +201,7 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
         const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
           temperature: reading.temperature || 0,
           humidity: reading.humidity || 0,
-          weight: scaleWeight(reading.weight || 0), // Use the new scaleWeight for historical data too
+          weight: scaleWeight(reading.weight || 0),
           sound: reading.sound_dB || 0,
           timestamp: reading.timestamp * 1000,
         }));
@@ -260,23 +211,41 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
       console.error("Error fetching beehive history:", error);
     });
 
-  const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
-  get(historyQuery2).then((snapshot) => {
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
-        temperature: reading.temperature || 0,
-        humidity: reading.humidity || 0,
-        weight: reading.weight || 0, // This history uses raw weight from Firebase
-        sound: reading.sound_dB || 0,
-        timestamp: reading.timestamp * 1000,
-      }));
-      setHivesData(prev => prev.map(hive => hive.id === hive2Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
-    }
-  }).catch(error => {
-    console.error("Error fetching beehive2 history:", error);
-  });
-    return () => { unsubscribeCurrent(); unsubscribeImage(); unsubscribeCurrent2(); };
+    const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
+    get(historyQuery2).then((snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
+          temperature: reading.temperature || 0,
+          humidity: reading.humidity || 0,
+          weight: reading.weight || 0,
+          sound: reading.sound_dB || 0,
+          timestamp: reading.timestamp * 1000,
+        }));
+        setHivesData(prev => prev.map(hive => hive.id === hive2Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
+      }
+    }).catch(error => {
+      console.error("Error fetching beehive2 history:", error);
+    });
+
+    const historyQuery3 = query(ref(db, 'beehive_history3'), orderByKey(), limitToLast(100));
+    get(historyQuery3).then((snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
+          temperature: reading.temperature || 0,
+          humidity: reading.humidity || 0,
+          weight: reading.weight || 0,
+          sound: reading.sound_dB || 0,
+          timestamp: reading.timestamp * 1000,
+        }));
+        setHivesData(prev => prev.map(hive => hive.id === hive3Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
+      }
+    }).catch(error => {
+      console.error("Error fetching beehive3 history:", error);
+    });
+
+    return () => { unsubscribeCurrent(); unsubscribeImage(); unsubscribeCurrent2(); unsubscribeCurrent3(); };
   }, [selectedHiveId]);
 
   useEffect(() => {
@@ -284,15 +253,15 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
       setHivesData(prevHives => {
         const newTimestamp = Date.now();
         return prevHives.map(hive => {
-          if (hive.id === 'bwise-1' || hive.id === 'bwise-2') return hive; // Hive 1 is handled by Firebase and scaled weight
+          if (hive.id === 'bwise-1' || hive.id === 'bwise-2' || hive.id === 'bwise-3') return hive;
           const newSensorData: SensorData = {
             temperature: hive.sensorData.temperature + (Math.random() - 0.5) * 0.2,
             humidity: hive.sensorData.humidity + (Math.random() - 0.5) * 2,
-            weight: generateRandomWeight(23000, 25000), // Simulate random decimals for other hives
+            weight: generateRandomWeight(23000, 25000),
             sound: hive.sensorData.sound + (Math.random() - 0.5) * 1,
             timestamp: newTimestamp,
           };
-          const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData]; // Keep history trimmed
+          const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData];
           return {
             ...hive,
             sensorData: newSensorData,
@@ -366,7 +335,6 @@ const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
     const lowerCasePrompt = prompt.toLowerCase();
     const isAnalysisRequest = analysisKeywords.some(keyword => lowerCasePrompt.includes(keyword));
 
-    // The logic below for `isAnalysisRequest` is fine to keep, as it only uses sensor data.
     if (isAnalysisRequest && !options.image) {
       const { temperature, humidity, weight, sound } = currentHive.sensorData;
       finalPrompt = `The user asked: "${prompt}".
@@ -415,56 +383,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     }
   }, [selectedHiveId, hivesData]);
 
-  // Comment out or delete this entire function
-  // const handleStartImageAnalysis = useCallback(async (imageSource: string) => {
-  //   setChatLoading(true);
-  //   try {
-  //     const { base64, mimeType } = await urlToBase64(imageSource);
-  //     const prompt = "Analyze this hive image for me.";
-  //     await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
-  //   } catch (error) {
-  //     console.error("Error analyzing image from source:", error);
-  //     const errorMessage: string = "Sorry, I couldn't analyze that image. It might be due to a network issue or browser security policy (CORS). Try uploading an image instead.";
-  //     setHivesData(prevHives => prevHives.map(hive =>
-  //       hive.id === selectedHiveId
-  //         ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
-  //         : hive
-  //     ));
-  //     setChatLoading(false);
-  //   }
-  // }, [handleSendMessage, selectedHiveId]);
-
-  // Comment out or delete this entire function
-  // const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (!selectedHiveId) return;
-  //   const file = event.target.files?.[0];
-
-  //   if (file) {
-  //     setChatLoading(true);
-  //     const objectURL = URL.createObjectURL(file);
-  //     objectURLsRef.current.push(objectURL);
-
-  //     setHivesData(hives => hives.map(h => h.id === selectedHiveId ? { ...h, image: objectURL, imageTimestamp: Date.now() } : h));
-
-  //     try {
-  //       const { base64, mimeType } = await fileToBase64(file);
-  //       const prompt = "Analyze this image I've uploaded.";
-  //       await handleSendMessage(prompt, { isNewConversation: true, image: { base64, mimeType } });
-  //     } catch (error) {
-  //       console.error("Error analyzing uploaded file:", error);
-  //       const errorMessage: string = "Sorry, something went wrong while analyzing the uploaded file.";
-  //       setHivesData(prevHives => prevHives.map(hive =>
-  //         hive.id === selectedHiveId
-  //           ? { ...hive, chatHistory: [{ role: 'model', content: errorMessage }] }
-  //           : hive
-  //       ));
-  //       setChatLoading(false);
-  //     } finally {
-  //       // No specific action needed here as chatLoading is handled in try/catch
-  //     }
-  //   }
-  // };
-
   useEffect(() => {
     return () => {
       objectURLsRef.current.forEach(url => URL.revokeObjectURL(url));
@@ -481,7 +399,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
   if (!selectedHive) return <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">Loading Apiary Dashboard...</div>;
 
-  // Change the destructuring to remove image variables
   const { sensorData, weightHistory, fullHistory, chatHistory } = selectedHive;
   const tempStatus = getStatusColor(sensorData.temperature, TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH);
   const humidityStatus = getStatusColor(sensorData.humidity, HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH);
@@ -489,11 +406,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
   return (
     <>
-      {/* Remove the image modal component */}
-      {/* <Modal isOpen={isImageModalOpen} onClose={() => setImageModalOpen(false)} title="Latest Hive Image">
-        <img src={image} alt="Full view of the hive" className="w-full h-auto rounded-lg" />
-      </Modal> */}
-
       <Modal isOpen={isHistoryModalOpen} onClose={() => setHistoryModalOpen(false)} title={`Recent History for ${selectedHive.name} (Last 100 Records)`}>
         {isHistoryLoading ? <p>Loading history...</p> : (
           <div className="overflow-x-auto">
@@ -504,7 +416,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
                 </tr>
               </thead>
               <tbody>
-                {/* Ensure key is unique and stable */}
                 {[...fullHistory].reverse().map((reading, index) => (
                   <tr key={reading.timestamp + '-' + index} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="px-4 py-2">{new Date(reading.timestamp).toLocaleString()}</td>
@@ -538,22 +449,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
             <div className="bg-white rounded-xl p-4 shadow-md"><GaugeChart value={sensorData.sound} title="Sound" unit="dB" min={10} max={100} status={soundStatus} /></div>
 
             <div className="lg:col-span-3 bg-white rounded-xl p-4 shadow-md flex flex-col"><AlertsCard alerts={alerts} /></div>
-
-            {/* Remove this entire div, which contains the image display and upload buttons */}
-            {/* <div className="lg:col-span-1 bg-white rounded-xl p-4 shadow-md flex flex-col">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Hive Image</h3>
-              <img src={image} alt="Hive Snapshot" className="rounded-md aspect-[4/3] object-cover cursor-pointer hover:ring-2 hover:ring-bwise-yellow transition-all" onClick={() => setImageModalOpen(true)} />
-              {imageTimestamp && (
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  Captured: {new Date(imageTimestamp).toLocaleDateString()} {new Date(imageTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              )}
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-              <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                <button onClick={() => handleStartImageAnalysis(image)} disabled={isChatLoading} className="w-full text-sm flex-1 bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors">Analyze This Image</button>
-                <button onClick={() => fileInputRef.current?.click()} disabled={isChatLoading} className="w-full text-sm flex-1 bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-md hover:bg-gray-300 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors">Upload & Analyze</button>
-              </div>
-            </div> */}
 
             <div className="lg:col-span-2 bg-white rounded-xl p-4 shadow-md flex flex-col">
               <ChatInterface
