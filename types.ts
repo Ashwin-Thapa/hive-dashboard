@@ -31,14 +31,30 @@ export interface ChatMessage {
   content: string;
 }
 
+// types.ts
+// types.ts
 export interface Hive {
-    id: string;
-    name: string;
-    sensorData: SensorData;
-    weightHistory: WeightHistoryPoint[];
-    fullHistory: HistoryEntry[];
-    image: string;
-    imageTimestamp?: number;
-    chat?: Chat;
-    chatHistory: ChatMessage[];
+  id: string;
+  name: string;
+  sensorData: SensorData;
+  fullHistory: HistoryEntry[];
+  weightHistory: { timestamp: number; weight: number }[];
+  chat?: any;
+  chatHistory: ChatMessage[];
+  // NEW (all optional to avoid breaking other code)
+  simEnabled?: boolean;
+  simClock?: number; // virtual clock in ms
+  simConfig?: {
+    baseTemp: number;
+    baseHum: number;
+    baseSound: number;
+    baseWeight: number;
+    // how “wobbly” each parameter is per tick
+    stepTemp: number;
+    stepHum: number;
+    stepSound: number;
+    stepWeight: number;
+  };
 }
+
+
