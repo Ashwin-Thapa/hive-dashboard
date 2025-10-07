@@ -97,182 +97,198 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
+  // Current Firebase and History Fetch (Now only Hives 1 and 2)
+useEffect(() => {
     const hive1Id = 'bwise-1';
     const hive2Id = 'bwise-2';
-    const hive3Id = 'bwise-3';
+    // Hive 3 is now simulated
 
     const currentDbRef = ref(db, 'beehive');
     const unsubscribeCurrent = onValue(currentDbRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setHivesData(prev => prev.map(hive => {
-          if (hive.id === hive1Id) {
-            const rawWeight = data.weight || 0;
-            const newSensorData: SensorData = {
-              temperature: data.temperature || 0,
-              humidity: data.humidity || 0,
-              weight: scaleWeight(rawWeight),
-              sound: data.sound_dB || 0,
-              timestamp: data.timestamp * 1000,
-            };
-            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-            return { ...hive, sensorData: newSensorData, fullHistory: updatedHistory, weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })) };
-          }
-          return hive;
-        }));
-        setLastUpdated(new Date(data.timestamp * 1000));
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            setHivesData(prev => prev.map(hive => {
+                if (hive.id === hive1Id) {
+                    const rawWeight = data.weight || 0;
+                    const newSensorData: SensorData = {
+                        temperature: data.temperature || 0,
+                        humidity: data.humidity || 0,
+                        weight: scaleWeight(rawWeight),
+                        sound: data.sound_dB || 0,
+                        timestamp: data.timestamp * 1000,
+                    };
+                    const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+                    return { ...hive, sensorData: newSensorData, fullHistory: updatedHistory, weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })) };
+                }
+                return hive;
+            }));
+            if (selectedHiveId === hive1Id) {
+            setLastUpdated(new Date(data.timestamp * 1000));
+        }
       }
     });
 
     const currentDbRef2 = ref(db, 'beehive2');
     const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setHivesData(prev => prev.map(hive => {
-          if (hive.id === hive2Id) {
-            const newSensorData: SensorData = {
-              temperature: data.temperature || 0,
-              humidity: data.humidity || 0,
-              weight: data.weight || 0,
-              sound: data.sound_dB || 0,
-              timestamp: data.timestamp * 1000,
-            };
-            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-            return {
-              ...hive,
-              sensorData: newSensorData,
-              fullHistory: updatedHistory,
-              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-              lastUpdatedTimestamp: data.timestamp * 1000
-            };
-          }
-          return hive;
-        }));
-        if (selectedHiveId === hive2Id) {
-          setLastUpdated(new Date(data.timestamp * 1000));
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            setHivesData(prev => prev.map(hive => {
+                if (hive.id === hive2Id) {
+                    const newSensorData: SensorData = {
+                        temperature: data.temperature || 0,
+                        humidity: data.humidity || 0,
+                        weight: data.weight || 0,
+                        sound: data.sound_dB || 0,
+                        timestamp: data.timestamp * 1000,
+                    };
+                    const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+                    return {
+                        ...hive,
+                        sensorData: newSensorData,
+                        fullHistory: updatedHistory,
+                        weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
+                        lastUpdatedTimestamp: data.timestamp * 1000
+                    };
+                }
+                return hive;
+            }));
+            if (selectedHiveId === hive2Id) {
+                setLastUpdated(new Date(data.timestamp * 1000));
+            }
         }
-      }
     });
-
-    const currentDbRef3 = ref(db, 'beehive3');
-    const unsubscribeCurrent3 = onValue(currentDbRef3, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setHivesData(prev => prev.map(hive => {
-          if (hive.id === hive3Id) {
-            const newSensorData: SensorData = {
-              temperature: data.temperature || 0,
-              humidity: data.humidity || 0,
-              weight: data.weight || 0,
-              sound: data.sound_dB || 0,
-              timestamp: data.timestamp * 1000,
-            };
-            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-            return {
-              ...hive,
-              sensorData: newSensorData,
-              fullHistory: updatedHistory,
-              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-              lastUpdatedTimestamp: data.timestamp * 1000
-            };
-          }
-          return hive;
-        }));
-        if (selectedHiveId === hive3Id) {
-          setLastUpdated(new Date(data.timestamp * 1000));
-        }
-      }
-    });
+    
+    // *** The currentDbRef3 block has been REMOVED here ***
 
     const imageDbRef = ref(db, 'bwise_images/latest');
     const unsubscribeImage = onValue(imageDbRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const imageTimestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
-        setHivesData(prev => prev.map(hive => hive.id === hive1Id ? { ...hive, image: data.url, imageTimestamp } : hive));
-      }
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            const imageTimestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
+            setHivesData(prev => prev.map(hive => hive.id === hive1Id ? { ...hive, image: data.url, imageTimestamp } : hive));
+        }
     });
 
-    const historyQuery = query(ref(db, 'beehive_history'), orderByKey(), limitToLast(100));
-    get(historyQuery).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
-          temperature: reading.temperature || 0,
-          humidity: reading.humidity || 0,
-          weight: scaleWeight(reading.weight || 0),
-          sound: reading.sound_dB || 0,
-          timestamp: reading.timestamp * 1000,
-        }));
-        setHivesData(prev => prev.map(hive => hive.id === hive1Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
-      }
-    }).catch(error => {
-      console.error("Error fetching beehive history:", error);
-    });
+    // --- beehive_history (Hive 1) ---
+const historyQuery = query(ref(db, 'beehive_history'), orderByKey(), limitToLast(100));
+get(historyQuery).then((snapshot) => {
+  if (snapshot.exists()) {
+    const obj = snapshot.val() as Record<string, any>;
+    const history: HistoryEntry[] = Object
+      .entries(obj)
+      .sort(([a], [b]) => a.localeCompare(b)) // ensure ascending order
+      .map(([, reading]) => ({
+        temperature: reading.temperature || 0,
+        humidity: reading.humidity || 0,
+        weight: scaleWeight(reading.weight || 0),
+        sound: reading.sound_dB || 0,
+        timestamp: (reading.timestamp ?? 0) * 1000,
+      }));
 
-    const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
-    get(historyQuery2).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
-          temperature: reading.temperature || 0,
-          humidity: reading.humidity || 0,
-          weight: reading.weight || 0,
-          sound: reading.sound_dB || 0,
-          timestamp: reading.timestamp * 1000,
-        }));
-        setHivesData(prev => prev.map(hive => hive.id === hive2Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
-      }
-    }).catch(error => {
-      console.error("Error fetching beehive2 history:", error);
-    });
+    setHivesData(prev => prev.map(h =>
+      h.id === hive1Id
+        ? { ...h, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) }
+        : h
+    ));
+  }
+}).catch(err => console.error("Error fetching beehive history:", err));
 
-    const historyQuery3 = query(ref(db, 'beehive_history3'), orderByKey(), limitToLast(100));
-    get(historyQuery3).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const history: HistoryEntry[] = Object.values(data).map((reading: any) => ({
-          temperature: reading.temperature || 0,
-          humidity: reading.humidity || 0,
-          weight: reading.weight || 0,
-          sound: reading.sound_dB || 0,
-          timestamp: reading.timestamp * 1000,
-        }));
-        setHivesData(prev => prev.map(hive => hive.id === hive3Id ? { ...hive, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) } : hive));
-      }
-    }).catch(error => {
-      console.error("Error fetching beehive3 history:", error);
-    });
+// --- beehive_history2 (Hive 2) ---
+const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
+get(historyQuery2).then((snapshot) => {
+  if (snapshot.exists()) {
+    const obj = snapshot.val() as Record<string, any>;
+    const history: HistoryEntry[] = Object
+      .entries(obj)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, reading]) => ({
+        temperature: reading.temperature || 0,
+        humidity: reading.humidity || 0,
+        weight: reading.weight || 0, // note: no scaleWeight for hive2
+        sound: reading.sound_dB || 0,
+        timestamp: (reading.timestamp ?? 0) * 1000,
+      }));
 
-    return () => { unsubscribeCurrent(); unsubscribeImage(); unsubscribeCurrent2(); unsubscribeCurrent3(); };
-  }, [selectedHiveId]);
+    setHivesData(prev => prev.map(h =>
+      h.id === hive2Id
+        ? { ...h, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) }
+        : h
+    ));
+  }
+}).catch(err => console.error("Error fetching beehive2 history:", err));
+
+
+    // *** The historyQuery3 block has been REMOVED here ***
+
+    return () => { 
+        unsubscribeCurrent(); 
+        unsubscribeImage(); 
+        unsubscribeCurrent2(); 
+        // unsubscribeCurrent3 is REMOVED
+    };
+}, [selectedHiveId]);
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
+  // 10 minutes = 600000 milliseconds
+  const simulationInterval = 600000;
+
+  const intervalId = setInterval(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    if (currentHour >= 6 && currentHour < 17) {
+      const newTimestamp = Date.now();
+      let shouldUpdateLastUpdated = false;
+
       setHivesData(prevHives => {
-        const newTimestamp = Date.now();
-        return prevHives.map(hive => {
-          if (hive.id === 'bwise-1' || hive.id === 'bwise-2' || hive.id === 'bwise-3') return hive;
+        const nextHives = prevHives.map(hive => {
+          // Skip Firebase-controlled hives (1 & 2)
+          if (hive.id === 'bwise-1' || hive.id === 'bwise-2') return hive;
+
+          // Simulate only for 3–10
+          // Basic gentle drift + noise
+          const last = hive.sensorData;
+          const temp = (last.temperature ?? 34) + (Math.random() - 0.5) * 0.6;
+          const hum = (last.humidity ?? 60) + (Math.random() - 0.5) * 1.5;
+          const sound = (last.sound ?? 55) + (Math.random() - 0.5) * 2.5;
+
+          // Weight: small day-time change (foraging flow)
+          const weight = (last.weight ?? 24000) + (Math.random() - 0.5) * 30;
+
           const newSensorData: SensorData = {
-            temperature: hive.sensorData.temperature + (Math.random() - 0.5) * 0.2,
-            humidity: hive.sensorData.humidity + (Math.random() - 0.5) * 2,
-            weight: generateRandomWeight(23000, 25000),
-            sound: hive.sensorData.sound + (Math.random() - 0.5) * 1,
+            temperature: Math.max(20, Math.min(45, temp)),
+            humidity: Math.max(20, Math.min(90, hum)),
+            sound: Math.max(10, Math.min(100, sound)),
+            weight,
             timestamp: newTimestamp,
           };
-          const newFullHistory = [...hive.fullHistory.slice(-99), newSensorData];
+
+          const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+
+          if (hive.id === selectedHiveId) {
+            shouldUpdateLastUpdated = true;
+          }
+
           return {
             ...hive,
             sensorData: newSensorData,
-            fullHistory: newFullHistory,
-            weightHistory: newFullHistory.map((d) => ({ timestamp: d.timestamp, weight: d.weight }))
+            fullHistory: updatedHistory,
+            weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
           };
         });
+
+        return nextHives;
       });
-    }, 10000);
-    return () => clearInterval(intervalId);
-  }, []);
+
+      if (shouldUpdateLastUpdated) {
+        setLastUpdated(new Date(newTimestamp));
+      }
+    }
+  }, simulationInterval);
+
+  return () => clearInterval(intervalId);
+}, [selectedHiveId]);
+
 
   const selectedHive = hivesData.find(h => h.id === selectedHiveId);
 
