@@ -167,30 +167,44 @@ const App: React.FC = () => {
           stepWeight: randBetween(10, 40),
         };
 
-        // Each hive starts in the PAST (1-7 days ago) to avoid future timestamp
-        // each hive starts in the recent past (1-24 hours ago) to avoid future timestamps
-        const hoursAgo = randBetween(1, 24);
-        const simStart = NOW - (hoursAgo * 60 * 60 * 1000);
-
+        // original generation: points=20, step=15min
+        const stepMs = 15 * 60 * 1000;
         const { history, last, lastClock } = buildSimHistory(
           20,
-          15 * 60 * 1000, // 15 minutes step
-          simStart,
+          stepMs, // 15 minutes step
+          NOW - randBetween(1 * 60 * 60 * 1000, 24 * 60 * 60 * 1000), // original start in past
           simConfig
         );
+
+        // Shift all timestamps so the last entry is approximately "now" (with tiny jitter)
+        const now = Date.now();
+        // Add a small random jitter so not every hive has the exact same last timestamp
+        const jitter = Math.round(randBetween(0, stepMs));
+        const offset = now - lastClock - jitter;
+
+        const shiftedHistory = history.map(h => ({
+          ...h,
+          timestamp: h.timestamp + offset,
+        }));
+
+        const shiftedLast = {
+          ...last,
+          timestamp: last.timestamp + offset,
+        };
+        const shiftedLastClock = lastClock + offset;
 
         initialHives.push({
           id: `bwise-${j}`,
           name: `Bwise Hive #${j}`,
-          sensorData: last,
-          fullHistory: history,
-          weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
+          sensorData: shiftedLast,
+          fullHistory: shiftedHistory,
+          weightHistory: shiftedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
           chat: createChatSession(),
           chatHistory: [],
           simEnabled: true,
-          simClock: lastClock,
+          simClock: shiftedLastClock,
           simConfig,
-          lastUpdatedTimestamp: lastClock,
+          lastUpdatedTimestamp: shiftedLastClock,
         });
       }
     }
@@ -359,10 +373,10 @@ const App: React.FC = () => {
           if (!hive.simEnabled) return hive; // skip live hives 1 & 2
 
           // Ensure we don't go into the future - cap at current real time
-          // Ensure we don't go into the future - cap at current real time
-const currentRealTime = Date.now();
-const currentSimTime = hive.simClock || currentRealTime;
-const nextClock = Math.min(currentRealTime, currentSimTime + simulationStep);
+          const currentRealTime = Date.now();
+          const currentSimTime = hive.simClock || currentRealTime;
+          const nextClock = Math.min(currentRealTime, currentSimTime + simulationStep);
+
           const cfg = hive.simConfig ?? {
             baseTemp: 34, baseHum: 60, baseSound: 55, baseWeight: 24000,
             stepTemp: 0.5, stepHum: 1.5, stepSound: 2.0, stepWeight: 25,
@@ -530,12 +544,6 @@ Remember to respond as Bwise, the friendly apiculturist.`;
       setChatLoading(false);
     }
   }, [selectedHiveId, hivesData]);
-
-  useEffect(() => {
-    return () => {
-      objectURLsRef.current.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
 
   const handleHistoryClick = () => { setHistoryLoading(true); setHistoryModalOpen(true); setTimeout(() => setHistoryLoading(false), 500); };
 
