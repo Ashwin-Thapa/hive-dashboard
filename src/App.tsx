@@ -8,7 +8,8 @@ import {
   SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_WARNING_HIGH, SOUND_CRITICAL_HIGH,
 } from './constants';
 import { createChatSession } from './services/geminiService';
-import { db, ref, onValue, get, query, limitToLast, orderByKey } from './services/firebase';
+// NOTE: Firebase imports removed as requested for full simulation
+// import { db, ref, onValue, get, query, limitToLast, orderByKey } from './services/firebase';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import GaugeChart from './components/GaugeChart';
@@ -21,7 +22,7 @@ import ChatInterface from './components/ChatInterface';
 
 // ---- Local extension to avoid editing your global Hive type ----
 type SimFields = {
-  simEnabled?: boolean;
+  simEnabled: boolean;
   simClock?: number; // virtual time in ms
   simConfig?: {
     baseTemp: number;
@@ -33,9 +34,10 @@ type SimFields = {
     stepSound: number;
     stepWeight: number;
   };
+  nextSimUpdateTime?: number; // Next scheduled update time (for staggering)
   image?: string;
   imageTimestamp?: number;
-  lastUpdatedTimestamp?: number;
+  lastUpdatedTimestamp?: number; // Now safe to be used with ??
 };
 type HiveSim = Hive & SimFields;
 
@@ -84,10 +86,11 @@ const buildSimHistory = (
   for (let i = 0; i < points; i++) {
     tClock += stepMs;
 
-    temp = stepAround(temp, cfg.stepTemp, 20, 45);
-    hum  = stepAround(hum,  cfg.stepHum,  20, 90);
-    snd  = stepAround(snd,  cfg.stepSound,10, 100);
-    wgt  = stepAround(wgt,  cfg.stepWeight, 20000, 30000);
+    // Tighter/realistic ranges for simulation
+    temp = stepAround(temp, cfg.stepTemp, 30, 40); 
+    hum  = stepAround(hum,  cfg.stepHum,  45, 80); 
+    snd  = stepAround(snd,  cfg.stepSound,30, 80); 
+    wgt  = stepAround(wgt,  cfg.stepWeight, 22000, 35000); 
 
     history.push({
       timestamp: tClock,
@@ -102,6 +105,14 @@ const buildSimHistory = (
   return { history, last, lastClock: tClock };
 };
 
+// Function to get a random timestamp within the next 10 minutes
+const getNextRandomUpdateTime = (currentTimestamp: number): number => {
+    // Random time between 1 second and 10 minutes (600,000 ms)
+    const randomDelay = randBetween(1000, 600000);
+    return currentTimestamp + randomDelay;
+};
+
+
 const App: React.FC = () => {
   const [hivesData, setHivesData] = useState<HiveSim[]>([]);
   const [selectedHiveId, setSelectedHiveId] = useState<string | null>('bwise-1');
@@ -112,101 +123,63 @@ const App: React.FC = () => {
   const [isChatLoading, setChatLoading] = useState(false);
   const objectURLsRef = useRef<string[]>([]);
 
-  // ---- Initialize all hives (1–10), with 3–10 simulated via virtual time ----
+  // ---- 1. Initialize all hives (1–10) with simulation enabled ----
   useEffect(() => {
     const initialHives: HiveSim[] = [];
-    const NOW = Date.now(); // Use current time as reference
+    const NOW = Date.now(); 
 
     for (let j = 1; j <= 10; j++) {
-      const isHive1 = j === 1;
-      const isHive2 = j === 2;
+      // ---- ALL HIVES 1–10: full simulation ----
+      const simConfig = {
+        baseTemp: randBetween(33, 36), 
+        baseHum: randBetween(55, 65),
+        baseSound: randBetween(40, 60),
+        baseWeight: randBetween(24000, 27000),
+        stepTemp: randBetween(0.1, 0.5), 
+        stepHum: randBetween(0.5, 1.5),
+        stepSound: randBetween(0.8, 2.5),
+        stepWeight: randBetween(5, 30),
+      };
 
-      if (isHive1 || isHive2) {
-        // Boot history for live hives; Firebase will overwrite quickly
-        const now = Date.now();
-        const fullHistory: HistoryEntry[] = [];
-        for (let i = 20; i > 0; i--) {
-          const temp = 34 + (Math.random() - 0.5) * 4;
-          const hum  = 55 + Math.random() * 25;
-          const snd  = 50 + Math.random() * 20;
+      const stepMs = 15 * 60 * 1000;
+      const { history, last, lastClock } = buildSimHistory(
+        20,
+        stepMs,
+        NOW - randBetween(1 * 60 * 60 * 1000, 24 * 60 * 60 * 1000), 
+        simConfig
+      );
 
-          const weight = isHive1
-            ? scaleWeight(generateRandomWeight(-200, 200))
-            : Math.round(generateRandomWeight(23000, 25000));
+      const now = Date.now();
+      const jitter = Math.round(randBetween(0, stepMs));
+      const offset = now - lastClock - jitter;
 
-          fullHistory.push({
-            timestamp: now - i * 60000 * 15,
-            temperature: temp,
-            humidity: hum,
-            weight,
-            sound: snd,
-          });
-        }
+      const shiftedHistory = history.map(h => ({
+        ...h,
+        timestamp: h.timestamp + offset,
+      }));
 
-        initialHives.push({
-          id: `bwise-${j}`,
-          name: `Bwise Hive #${j}`,
-          sensorData: fullHistory[fullHistory.length - 1],
-          fullHistory,
-          weightHistory: fullHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-          chat: createChatSession(),
-          chatHistory: [],
-          simEnabled: false, // live hives
-          lastUpdatedTimestamp: now,
-        });
-      } else {
-        // ---- HIVES 3–10: full simulation ----
-        const simConfig = {
-          baseTemp: randBetween(31, 36),
-          baseHum: randBetween(50, 70),
-          baseSound: randBetween(45, 65),
-          baseWeight: randBetween(23000, 26000),
-          stepTemp: randBetween(0.2, 0.7),
-          stepHum: randBetween(0.8, 2.0),
-          stepSound: randBetween(1.0, 3.0),
-          stepWeight: randBetween(10, 40),
-        };
+      const shiftedLast = {
+        ...last,
+        timestamp: last.timestamp + offset,
+      };
+      const shiftedLastClock = lastClock + offset;
+      
+      const nextSimUpdateTime = getNextRandomUpdateTime(shiftedLastClock);
 
-        // original generation: points=20, step=15min
-        const stepMs = 15 * 60 * 1000;
-        const { history, last, lastClock } = buildSimHistory(
-          20,
-          stepMs, // 15 minutes step
-          NOW - randBetween(1 * 60 * 60 * 1000, 24 * 60 * 60 * 1000), // original start in past
-          simConfig
-        );
-
-        // Shift all timestamps so the last entry is approximately "now" (with tiny jitter)
-        const now = Date.now();
-        // Add a small random jitter so not every hive has the exact same last timestamp
-        const jitter = Math.round(randBetween(0, stepMs));
-        const offset = now - lastClock - jitter;
-
-        const shiftedHistory = history.map(h => ({
-          ...h,
-          timestamp: h.timestamp + offset,
-        }));
-
-        const shiftedLast = {
-          ...last,
-          timestamp: last.timestamp + offset,
-        };
-        const shiftedLastClock = lastClock + offset;
-
-        initialHives.push({
-          id: `bwise-${j}`,
-          name: `Bwise Hive #${j}`,
-          sensorData: shiftedLast,
-          fullHistory: shiftedHistory,
-          weightHistory: shiftedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-          chat: createChatSession(),
-          chatHistory: [],
-          simEnabled: true,
-          simClock: shiftedLastClock,
-          simConfig,
-          lastUpdatedTimestamp: shiftedLastClock,
-        });
-      }
+      initialHives.push({
+        id: `bwise-${j}`,
+        name: `Bwise Hive #${j}`,
+        sensorData: shiftedLast,
+        fullHistory: shiftedHistory,
+        weightHistory: shiftedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
+        chat: createChatSession(),
+        chatHistory: [],
+        simEnabled: true, // ALL Hives are now simulated
+        simClock: shiftedLastClock,
+        simConfig,
+        lastUpdatedTimestamp: shiftedLastClock,
+        nextSimUpdateTime, 
+      });
     }
 
     setHivesData(initialHives);
@@ -214,7 +187,8 @@ const App: React.FC = () => {
     // Set initial lastUpdated based on selected hive
     const initialSelectedHive = initialHives.find(h => h.id === selectedHiveId);
     if (initialSelectedHive) {
-      setLastUpdated(new Date(initialSelectedHive.lastUpdatedTimestamp || Date.now()));
+      // FIX 1: Use nullish coalescing (??) for safe access
+      setLastUpdated(new Date(initialSelectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
 
     return () => {
@@ -223,159 +197,33 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // ---- Firebase: live updates for Hive 1 & 2 only ----
+  // ---- 2. REMOVED Firebase useEffect ----
   useEffect(() => {
-    const hive1Id = 'bwise-1';
-    const hive2Id = 'bwise-2';
-
-    const currentDbRef = ref(db, 'beehive');
-    const unsubscribeCurrent = onValue(currentDbRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const timestamp = data.timestamp * 1000;
-        
-        setHivesData(prev => prev.map(hive => {
-          if (hive.id === hive1Id) {
-            const rawWeight = data.weight || 0;
-            const newSensorData: SensorData = {
-              temperature: data.temperature || 0,
-              humidity: data.humidity || 0,
-              weight: scaleWeight(rawWeight),
-              sound: data.sound_dB || 0,
-              timestamp: timestamp,
-            };
-            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-            return {
-              ...hive,
-              sensorData: newSensorData,
-              fullHistory: updatedHistory,
-              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-              lastUpdatedTimestamp: timestamp,
-            };
-          }
-          return hive;
-        }));
-        
-        // Update lastUpdated only if hive1 is currently selected
-        if (selectedHiveId === hive1Id) {
-          setLastUpdated(new Date(timestamp));
-        }
-      }
-    });
-
-    const currentDbRef2 = ref(db, 'beehive2');
-    const unsubscribeCurrent2 = onValue(currentDbRef2, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const timestamp = data.timestamp * 1000;
-        
-        setHivesData(prev => prev.map(hive => {
-          if (hive.id === hive2Id) {
-            const newSensorData: SensorData = {
-              temperature: data.temperature || 0,
-              humidity: data.humidity || 0,
-              weight: data.weight || 0,
-              sound: data.sound_dB || 0,
-              timestamp: timestamp,
-            };
-            const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-            return {
-              ...hive,
-              sensorData: newSensorData,
-              fullHistory: updatedHistory,
-              weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-              lastUpdatedTimestamp: timestamp,
-            };
-          }
-          return hive;
-        }));
-        
-        // Update lastUpdated only if hive2 is currently selected
-        if (selectedHiveId === hive2Id) {
-          setLastUpdated(new Date(timestamp));
-        }
-      }
-    });
-
-    // Latest image for Hive 1 (unchanged)
-    const imageDbRef = ref(db, 'bwise_images/latest');
-    const unsubscribeImage = onValue(imageDbRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const imageTimestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
-        setHivesData(prev => prev.map(hive => hive.id === hive1Id ? { ...hive, image: data.url, imageTimestamp } : hive));
-      }
-    });
-
-    // Hive 1 history
-    const historyQuery1 = query(ref(db, 'beehive_history'), orderByKey(), limitToLast(100));
-    get(historyQuery1).then((snapshot) => {
-      if (snapshot.exists()) {
-        const obj = snapshot.val() as Record<string, any>;
-        const history: HistoryEntry[] = Object
-          .entries(obj)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([, reading]) => ({
-            temperature: reading.temperature || 0,
-            humidity: reading.humidity || 0,
-            weight: scaleWeight(reading.weight || 0),
-            sound: reading.sound_dB || 0,
-            timestamp: (reading.timestamp ?? 0) * 1000,
-          }));
-
-        setHivesData(prev => prev.map(h =>
-          h.id === hive1Id
-            ? { ...h, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) }
-            : h
-        ));
-      }
-    }).catch(err => console.error("Error fetching beehive history:", err));
-
-    // Hive 2 history
-    const historyQuery2 = query(ref(db, 'beehive_history2'), orderByKey(), limitToLast(100));
-    get(historyQuery2).then((snapshot) => {
-      if (snapshot.exists()) {
-        const obj = snapshot.val() as Record<string, any>;
-        const history: HistoryEntry[] = Object
-          .entries(obj)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([, reading]) => ({
-            temperature: reading.temperature || 0,
-            humidity: reading.humidity || 0,
-            weight: reading.weight || 0, // hive2 weight is already grams
-            sound: reading.sound_dB || 0,
-            timestamp: (reading.timestamp ?? 0) * 1000,
-          }));
-
-        setHivesData(prev => prev.map(h =>
-          h.id === hive2Id
-            ? { ...h, fullHistory: history, weightHistory: history.map(d => ({ timestamp: d.timestamp, weight: d.weight })) }
-            : h
-        ));
-      }
-    }).catch(err => console.error("Error fetching beehive2 history:", err));
-
-    return () => {
-      unsubscribeCurrent();
-      unsubscribeImage();
-      unsubscribeCurrent2();
-    };
+    return () => {};
   }, [selectedHiveId]);
 
-  // ---- Simulation loop: advance only simulated hives (3–10) using VIRTUAL time ----
+
+  // ---- 3. Simulation loop: advance ALL simulated hives (1–10) with staggered timing ----
   useEffect(() => {
-    const simulationInterval = 600000; // 10 minutes in real time
-    const simulationStep = 600000; // 10 minutes in virtual time
+    const checkInterval = 60000; // Check every 1 minute
+    const simulationStep = 600000; 
 
     const intervalId = setInterval(() => {
+      const currentRealTime = Date.now();
+      const currentHour = new Date(currentRealTime).getHours();
+
+      // 🛑 NEW TIME WINDOW CHECK: Only update if the hour is between 5 AM (5) and 6 PM (18)
+      // If it's outside this window (6:00 PM to 4:59 AM), skip the update.
+      if (currentHour < 5 || currentHour >= 18) { 
+          return; 
+      }
+      
       setHivesData(prevHives => {
         const nextHives = prevHives.map(hive => {
-          if (!hive.simEnabled) return hive; // skip live hives 1 & 2
-
-          // Ensure we don't go into the future - cap at current real time
-          const currentRealTime = Date.now();
-          const currentSimTime = hive.simClock || currentRealTime;
-          const nextClock = Math.min(currentRealTime, currentSimTime + simulationStep);
+          // Check if it's past the hive's specific, randomly scheduled update time
+          if (!hive.simEnabled || (hive.nextSimUpdateTime && currentRealTime < hive.nextSimUpdateTime)) {
+              return hive; // Not time to update yet
+          }
 
           const cfg = hive.simConfig ?? {
             baseTemp: 34, baseHum: 60, baseSound: 55, baseWeight: 24000,
@@ -387,23 +235,49 @@ const App: React.FC = () => {
             humidity: cfg.baseHum,
             sound: cfg.baseSound,
             weight: cfg.baseWeight,
-            timestamp: nextClock - simulationStep,
+            timestamp: currentRealTime - simulationStep, // Default 10 min step if missing
           };
 
-          const temperature = stepAround(last.temperature, cfg.stepTemp, 20, 45);
-          const humidity   = stepAround(last.humidity,    cfg.stepHum,  20, 90);
-          const sound      = stepAround(last.sound,       cfg.stepSound,10, 100);
-          const weight     = stepAround(last.weight,      cfg.stepWeight, 20000, 30000);
+          const nextClock = currentRealTime; 
+
+          const temperature = stepAround(last.temperature, cfg.stepTemp, 30, 40);
+          const humidity   = stepAround(last.humidity,    cfg.stepHum,  45, 80);
+          const sound      = stepAround(last.sound,       cfg.stepSound,30, 80);
+          
+          // 1. Base Weight step (your existing logic)
+          const weight = stepAround(last.weight, cfg.stepWeight, 22000, 35000);
+
+          // 2. DAILY WEIGHT FLUCTUATION (Adding realism)
+          let dailyWeightModifier = 0;
+          const fluctuationMagnitude = 100; // Grams of maximum daily swing in one step
+
+          if (currentHour >= 7 && currentHour < 11) {
+            // Morning (7:00 - 10:59): Rapid drop as foragers leave
+            dailyWeightModifier = -randBetween(0.5, 1.5) * (fluctuationMagnitude / 4);
+          } else if (currentHour >= 11 && currentHour < 19) {
+            // Day (11:00 - 18:59): Net gain from returning foragers (max gain midday)
+            dailyWeightModifier = randBetween(0.5, 2.5) * (fluctuationMagnitude / 8);
+          } else if (currentHour >= 19 || currentHour < 7) {
+            // Night (19:00 - 06:59): Slow loss due to respiration/evaporation
+            dailyWeightModifier = -randBetween(0.1, 0.5) * (fluctuationMagnitude / 10);
+          }
+
+          // Apply the modifier. This gives the weight a time-dependent bias.
+          const finalWeight = Math.round(weight + dailyWeightModifier);
 
           const newSensorData: SensorData = {
             temperature,
             humidity,
             sound,
-            weight: Math.round(weight),
-            timestamp: nextClock, // VIRTUAL timestamp (capped at current real time)
+            // Use the finalWeight variable here
+            weight: finalWeight, 
+            timestamp: nextClock, // Use current real time as the VIRTUAL timestamp (in IST)
           };
-
+          
           const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
+
+          // Set the next random update time (1-10 minutes from NOW)
+          const nextUpdate = getNextRandomUpdateTime(currentRealTime);
 
           return {
             ...hive,
@@ -412,32 +286,36 @@ const App: React.FC = () => {
             weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
             simClock: nextClock,
             lastUpdatedTimestamp: nextClock,
+            nextSimUpdateTime: nextUpdate, // Schedule the next random update
           };
         });
 
-        // Update lastUpdated for currently selected hive if it's simulated
+        // Update lastUpdated for currently selected hive if it was just updated
         const selectedHive = nextHives.find(h => h.id === selectedHiveId);
-        if (selectedHive?.simEnabled) {
-          setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp || Date.now()));
+        if (selectedHive && selectedHive.lastUpdatedTimestamp && selectedHive.lastUpdatedTimestamp >= (currentRealTime - checkInterval)) {
+          // FIX 2: Use nullish coalescing (??) for safe access
+          setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
         }
 
         return nextHives;
       });
-    }, simulationInterval);
+    }, checkInterval); 
 
     return () => clearInterval(intervalId);
   }, [selectedHiveId]);
-
-  // Update lastUpdated when selected hive changes
+  
+  // ---- 4. Update lastUpdated when selected hive changes ----
   useEffect(() => {
     const selectedHive = hivesData.find(h => h.id === selectedHiveId);
     if (selectedHive) {
-      setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp || Date.now()));
+      // FIX 3: Use nullish coalescing (??) for safe access
+      setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
   }, [selectedHiveId, hivesData]);
 
   const selectedHive = hivesData.find(h => h.id === selectedHiveId);
 
+  // Alerts logic (remains unchanged)
   useEffect(() => {
     if (!selectedHive || !selectedHive.sensorData.timestamp) return;
 
@@ -596,7 +474,8 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
           <div className="text-center mb-6">
             <p className="text-sm text-gray-500">Displaying data for <span className="font-bold">{selectedHive.name}</span></p>
-            <p className="text-sm text-gray-500">Last Updated: {lastUpdated?.toLocaleString()}</p>
+            {/* Display lastUpdated safely */}
+            <p className="text-sm text-gray-500">Last Updated: {lastUpdated?.toLocaleString() ?? 'Loading...'}</p>
             
           </div>
 
