@@ -41,22 +41,6 @@ type SimFields = {
 };
 type HiveSim = Hive & SimFields;
 
-// ---- Existing helpers ----
-const generateRandomWeight = (min: number, max: number): number => {
-  return min + (Math.random() * (max - min));
-};
-
-const scaleWeight = (rawWeight: number): number => {
-  const randomNumberBase = generateRandomWeight(23000, 25000);
-  let finalGramWeight: number;
-  if (rawWeight >= 0) {
-    finalGramWeight = randomNumberBase - rawWeight;
-  } else {
-    finalGramWeight = randomNumberBase + rawWeight;
-  }
-  return finalGramWeight;
-};
-
 // ---- Simulation helpers (independent randoms & history generation) ----
 const randBetween = (min: number, max: number) => min + Math.random() * (max - min);
 
