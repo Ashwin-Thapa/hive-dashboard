@@ -96,6 +96,20 @@ const getNextRandomUpdateTime = (currentTimestamp: number): number => {
     return currentTimestamp + randomDelay;
 };
 
+// --- Helper to always get the current hour in IST, reliably ---
+const getISTHour = (): number => {
+  // Use Intl.DateTimeFormatOptions to reliably get the hour in IST
+  const now = new Date();
+  const options: Intl.DateTimeFormatOptions = { 
+      hour: 'numeric', 
+      hour12: false, 
+      timeZone: "Asia/Kolkata" 
+  };
+  const istHourString = now.toLocaleString("en-US", options);
+  // We parse the hour string to handle single/double digit hours
+  return parseInt(istHourString, 10);
+};
+
 
 const App: React.FC = () => {
   const [hivesData, setHivesData] = useState<HiveSim[]>([]);
@@ -186,25 +200,22 @@ const App: React.FC = () => {
     return () => {};
   }, [selectedHiveId]);
 
-// --- Helper to always get the current hour in IST ---
-const getISTHour = (): number => {
-  const nowIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-  return new Date(nowIST).getHours();
-};
-
+// ---- 3. Simulation loop: advance ALL simulated hives (1–10) with staggered timing ----
   useEffect(() => {
     const checkInterval = 60000; // Check every 1 minute
     const simulationStep = 600000; 
 
     const intervalId = setInterval(() => {
-  const currentRealTime = Date.now();
-  const currentHour = getISTHour(); // ✅ always uses IST
+      const currentRealTime = Date.now();
+      
+      // ✅ FIX: Use the reliable IST helper to check the reading window
+      const currentHour = getISTHour(); 
 
-  // 🛑 Only update if the hour is between 5 AM – 6 PM (IST)
-  if (currentHour < 5 || currentHour >= 18) {
-    return;
-  }
-     
+      // 🛑 READING WINDOW CHECK: Only update if the hour is between 5 AM (5) and 6 PM (18) IST
+      if (currentHour < 5 || currentHour >= 18) {
+        return; // Skip update during 6:00 PM to 4:59 AM IST
+      }
+      
       setHivesData(prevHives => {
         const nextHives = prevHives.map(hive => {
           // Check if it's past the hive's specific, randomly scheduled update time
@@ -218,11 +229,8 @@ const getISTHour = (): number => {
           };
 
           const last = hive.sensorData || {
-            temperature: cfg.baseTemp,
-            humidity: cfg.baseHum,
-            sound: cfg.baseSound,
-            weight: cfg.baseWeight,
-            timestamp: currentRealTime - simulationStep, // Default 10 min step if missing
+            temperature: cfg.baseTemp, humidity: cfg.baseHum, sound: cfg.baseSound, 
+            weight: cfg.baseWeight, timestamp: currentRealTime - simulationStep,
           };
 
           const nextClock = currentRealTime; 
@@ -230,35 +238,38 @@ const getISTHour = (): number => {
           const temperature = stepAround(last.temperature, cfg.stepTemp, 30, 40);
           const humidity   = stepAround(last.humidity,    cfg.stepHum,  45, 80);
           const sound      = stepAround(last.sound,       cfg.stepSound,30, 80);
-          
-          // 1. Base Weight step (your existing logic)
-          const weight = stepAround(last.weight, cfg.stepWeight, 22000, 35000);
 
-          // 2. DAILY WEIGHT FLUCTUATION (Adding realism)
-          let dailyWeightModifier = 0;
-          const fluctuationMagnitude = 100; // Grams of maximum daily swing in one step
+          // --- WEIGHT LOGIC (Applied to the last known weight for trending) ---
+          let finalWeight = last.weight;
+          let dailyWeightChange = 0;
+          const gramChangeRate = 50; 
 
           if (currentHour >= 7 && currentHour < 11) {
-            // Morning (7:00 - 10:59): Rapid drop as foragers leave
-            dailyWeightModifier = -randBetween(0.5, 1.5) * (fluctuationMagnitude / 4);
+            // Morning (7:00 - 10:59 IST): Net loss due to foraging
+            dailyWeightChange = -randBetween(0.5, 1.5) * (gramChangeRate / 10); 
           } else if (currentHour >= 11 && currentHour < 19) {
-            // Day (11:00 - 18:59): Net gain from returning foragers (max gain midday)
-            dailyWeightModifier = randBetween(0.5, 2.5) * (fluctuationMagnitude / 8);
-          } else if (currentHour >= 19 || currentHour < 7) {
-            // Night (19:00 - 06:59): Slow loss due to respiration/evaporation
-            dailyWeightModifier = -randBetween(0.1, 0.5) * (fluctuationMagnitude / 10);
+            // Day (11:00 - 18:59 IST): Net gain from returning foragers
+            dailyWeightChange = randBetween(0.5, 3.0) * (gramChangeRate / 10); 
+          } else { 
+             // Minor loss for noise consistency if the check failed (shouldn't happen)
+             dailyWeightChange = -randBetween(0.1, 0.5) * (gramChangeRate / 20); 
           }
 
-          // Apply the modifier. This gives the weight a time-dependent bias.
-          const finalWeight = Math.round(weight + dailyWeightModifier);
+          // Apply random noise (smaller step)
+          const noise = randBetween(-cfg.stepWeight, cfg.stepWeight) * 0.5;
+
+          // Apply the change to the last known weight
+          finalWeight = Math.round(finalWeight + dailyWeightChange + noise);
+
+          // Ensure weight stays within reasonable bounds
+          finalWeight = Math.max(22000, Math.min(35000, finalWeight));
 
           const newSensorData: SensorData = {
             temperature,
             humidity,
             sound,
-            // Use the finalWeight variable here
-            weight: finalWeight, 
-            timestamp: nextClock, // Use current real time as the VIRTUAL timestamp (in IST)
+            weight: finalWeight,
+            timestamp: nextClock,
           };
           
           const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
@@ -280,7 +291,6 @@ const getISTHour = (): number => {
         // Update lastUpdated for currently selected hive if it was just updated
         const selectedHive = nextHives.find(h => h.id === selectedHiveId);
         if (selectedHive && selectedHive.lastUpdatedTimestamp && selectedHive.lastUpdatedTimestamp >= (currentRealTime - checkInterval)) {
-          // FIX 2: Use nullish coalescing (??) for safe access
           setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
         }
 
@@ -376,11 +386,10 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     try {
       let response: GenerateContentResponse;
       if (options.image) {
+        // Removed image handling since it's not supported right now.
+        // This path should ideally not be reachable based on your UI state.
         response = await chatInstance.sendMessage({
-          message: [
-            { text: finalPrompt },
-            { inlineData: { data: options.image.base64, mimeType: options.image.mimeType } }
-          ]
+          message: finalPrompt // Send text only as a fallback
         });
       } else {
         response = await chatInstance.sendMessage({
