@@ -186,22 +186,25 @@ const App: React.FC = () => {
     return () => {};
   }, [selectedHiveId]);
 
+// --- Helper to always get the current hour in IST ---
+const getISTHour = (): number => {
+  const nowIST = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  return new Date(nowIST).getHours();
+};
 
-  // ---- 3. Simulation loop: advance ALL simulated hives (1–10) with staggered timing ----
   useEffect(() => {
     const checkInterval = 60000; // Check every 1 minute
     const simulationStep = 600000; 
 
     const intervalId = setInterval(() => {
-      const currentRealTime = Date.now();
-      const currentHour = new Date(currentRealTime).getHours();
+  const currentRealTime = Date.now();
+  const currentHour = getISTHour(); // ✅ always uses IST
 
-      // 🛑 NEW TIME WINDOW CHECK: Only update if the hour is between 5 AM (5) and 6 PM (18)
-      // If it's outside this window (6:00 PM to 4:59 AM), skip the update.
-      if (currentHour < 5 || currentHour >= 18) { 
-          return; 
-      }
-      
+  // 🛑 Only update if the hour is between 5 AM – 6 PM (IST)
+  if (currentHour < 5 || currentHour >= 18) {
+    return;
+  }
+     
       setHivesData(prevHives => {
         const nextHives = prevHives.map(hive => {
           // Check if it's past the hive's specific, randomly scheduled update time
