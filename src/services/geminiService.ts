@@ -1,7 +1,5 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 
-// IMPORTANT: The API key is sourced from Vite's environment variables.
-// Ensure you have a .env file in the root of your project with VITE_API_KEY="YOUR_API_KEY"
 const apiKey = import.meta.env.VITE_API_KEY;
 if (!apiKey) {
     throw new Error("VITE_API_KEY is not set in the environment variables. Please create a .env file.");

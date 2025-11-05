@@ -14,10 +14,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
     if (isOpen) {
       setIsRendered(true);
     } else {
-      // When closing, wait for the animation to finish before unmounting.
+     
       const timer = setTimeout(() => {
         setIsRendered(false);
-      }, 500); // Match CSS transition duration
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);

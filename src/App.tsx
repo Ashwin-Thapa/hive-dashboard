@@ -8,8 +8,7 @@ import {
   SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_WARNING_HIGH, SOUND_CRITICAL_HIGH,
 } from './constants';
 import { createChatSession } from './services/geminiService';
-// NOTE: Firebase imports removed as requested for full simulation
-// import { db, ref, onValue, get, query, limitToLast, orderByKey } from './services/firebase';
+
 import Header from './components/Header';
 import Footer from './components/Footer';
 import GaugeChart from './components/GaugeChart';
@@ -20,10 +19,10 @@ import HiveSelector from './components/HiveSelector';
 import LiveInfo from './components/LiveInfo';
 import ChatInterface from './components/ChatInterface';
 
-// ---- Local extension to avoid editing your global Hive type ----
+
 type SimFields = {
   simEnabled: boolean;
-  simClock?: number; // virtual time in ms
+  simClock?: number; 
   simConfig?: {
     baseTemp: number;
     baseHum: number;
@@ -34,14 +33,13 @@ type SimFields = {
     stepSound: number;
     stepWeight: number;
   };
-  nextSimUpdateTime?: number; // Next scheduled update time (for staggering)
+  nextSimUpdateTime?: number; 
   image?: string;
   imageTimestamp?: number;
-  lastUpdatedTimestamp?: number; // Now safe to be used with ??
+  lastUpdatedTimestamp?: number; 
 };
 type HiveSim = Hive & SimFields;
 
-// ---- Simulation helpers (independent randoms & history generation) ----
 const randBetween = (min: number, max: number) => min + Math.random() * (max - min);
 
 const stepAround = (current: number, step: number, min: number, max: number) => {
@@ -61,7 +59,6 @@ const buildSimHistory = (
   const history: HistoryEntry[] = [];
   let tClock = startClockMs - points * stepMs;
 
-  // start near baselines
   let temp = cfg.baseTemp + randBetween(-0.8, 0.8);
   let hum = cfg.baseHum + randBetween(-3, 3);
   let snd = cfg.baseSound + randBetween(-2, 2);
@@ -70,7 +67,6 @@ const buildSimHistory = (
   for (let i = 0; i < points; i++) {
     tClock += stepMs;
 
-    // Tighter/realistic ranges for simulation
     temp = stepAround(temp, cfg.stepTemp, 30, 40); 
     hum  = stepAround(hum,  cfg.stepHum,  45, 80); 
     snd  = stepAround(snd,  cfg.stepSound,30, 80); 
@@ -89,16 +85,14 @@ const buildSimHistory = (
   return { history, last, lastClock: tClock };
 };
 
-// Function to get a random timestamp within the next 10 minutes
 const getNextRandomUpdateTime = (currentTimestamp: number): number => {
-    // Random time between 1 second and 10 minutes (600,000 ms)
+   
     const randomDelay = randBetween(1000, 600000);
     return currentTimestamp + randomDelay;
 };
 
-// --- Helper to always get the current hour in IST, reliably ---
 const getISTHour = (): number => {
-  // Use Intl.DateTimeFormatOptions to reliably get the hour in IST
+ 
   const now = new Date();
   const options: Intl.DateTimeFormatOptions = { 
       hour: 'numeric', 
@@ -106,7 +100,7 @@ const getISTHour = (): number => {
       timeZone: "Asia/Kolkata" 
   };
   const istHourString = now.toLocaleString("en-US", options);
-  // We parse the hour string to handle single/double digit hours
+  
   return parseInt(istHourString, 10);
 };
 
@@ -121,13 +115,13 @@ const App: React.FC = () => {
   const [isChatLoading, setChatLoading] = useState(false);
   const objectURLsRef = useRef<string[]>([]);
 
-  // ---- 1. Initialize all hives (1–10) with simulation enabled ----
+
   useEffect(() => {
     const initialHives: HiveSim[] = [];
     const NOW = Date.now(); 
 
     for (let j = 1; j <= 10; j++) {
-      // ---- ALL HIVES 1–10: full simulation ----
+
       const simConfig = {
         baseTemp: randBetween(33, 36), 
         baseHum: randBetween(55, 65),
@@ -172,7 +166,7 @@ const App: React.FC = () => {
         weightHistory: shiftedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
         chat: createChatSession(),
         chatHistory: [],
-        simEnabled: true, // ALL Hives are now simulated
+        simEnabled: true, 
         simClock: shiftedLastClock,
         simConfig,
         lastUpdatedTimestamp: shiftedLastClock,
@@ -182,10 +176,10 @@ const App: React.FC = () => {
 
     setHivesData(initialHives);
     
-    // Set initial lastUpdated based on selected hive
+
     const initialSelectedHive = initialHives.find(h => h.id === selectedHiveId);
     if (initialSelectedHive) {
-      // FIX 1: Use nullish coalescing (??) for safe access
+
       setLastUpdated(new Date(initialSelectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
 
@@ -195,32 +189,32 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // ---- 2. REMOVED Firebase useEffect ----
+
   useEffect(() => {
     return () => {};
   }, [selectedHiveId]);
 
-// ---- 3. Simulation loop: advance ALL simulated hives (1–10) with staggered timing ----
+
   useEffect(() => {
-    const checkInterval = 60000; // Check every 1 minute
+    const checkInterval = 60000; 
     const simulationStep = 600000; 
 
     const intervalId = setInterval(() => {
       const currentRealTime = Date.now();
       
-      // ✅ FIX: Use the reliable IST helper to check the reading window
+
       const currentHour = getISTHour(); 
 
-      // 🛑 READING WINDOW CHECK: Only update if the hour is between 5 AM (5) and 6 PM (18) IST
+ 
       if (currentHour < 5 || currentHour >= 18) {
-        return; // Skip update during 6:00 PM to 4:59 AM IST
+        return; 
       }
       
       setHivesData(prevHives => {
         const nextHives = prevHives.map(hive => {
-          // Check if it's past the hive's specific, randomly scheduled update time
+
           if (!hive.simEnabled || (hive.nextSimUpdateTime && currentRealTime < hive.nextSimUpdateTime)) {
-              return hive; // Not time to update yet
+              return hive;
           }
 
           const cfg = hive.simConfig ?? {
@@ -236,32 +230,31 @@ const App: React.FC = () => {
           const nextClock = currentRealTime; 
 
           const temperature = stepAround(last.temperature, cfg.stepTemp, 30, 40);
-          const humidity   = stepAround(last.humidity,    cfg.stepHum,  45, 80);
-          const sound      = stepAround(last.sound,       cfg.stepSound,30, 80);
+          const humidity  = stepAround(last.humidity, cfg.stepHum, 45, 80);
+          const sound = stepAround(last.sound, cfg.stepSound,30, 80);
 
-          // --- WEIGHT LOGIC (Applied to the last known weight for trending) ---
           let finalWeight = last.weight;
           let dailyWeightChange = 0;
           const gramChangeRate = 50; 
 
           if (currentHour >= 7 && currentHour < 11) {
-            // Morning (7:00 - 10:59 IST): Net loss due to foraging
+            
             dailyWeightChange = -randBetween(0.5, 1.5) * (gramChangeRate / 10); 
           } else if (currentHour >= 11 && currentHour < 19) {
-            // Day (11:00 - 18:59 IST): Net gain from returning foragers
+            
             dailyWeightChange = randBetween(0.5, 3.0) * (gramChangeRate / 10); 
           } else { 
-             // Minor loss for noise consistency if the check failed (shouldn't happen)
+             
              dailyWeightChange = -randBetween(0.1, 0.5) * (gramChangeRate / 20); 
           }
 
-          // Apply random noise (smaller step)
+          
           const noise = randBetween(-cfg.stepWeight, cfg.stepWeight) * 0.5;
 
-          // Apply the change to the last known weight
+          
           finalWeight = Math.round(finalWeight + dailyWeightChange + noise);
 
-          // Ensure weight stays within reasonable bounds
+          
           finalWeight = Math.max(22000, Math.min(35000, finalWeight));
 
           const newSensorData: SensorData = {
@@ -274,7 +267,7 @@ const App: React.FC = () => {
           
           const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
 
-          // Set the next random update time (1-10 minutes from NOW)
+          
           const nextUpdate = getNextRandomUpdateTime(currentRealTime);
 
           return {
@@ -284,11 +277,11 @@ const App: React.FC = () => {
             weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
             simClock: nextClock,
             lastUpdatedTimestamp: nextClock,
-            nextSimUpdateTime: nextUpdate, // Schedule the next random update
+            nextSimUpdateTime: nextUpdate, 
           };
         });
 
-        // Update lastUpdated for currently selected hive if it was just updated
+        
         const selectedHive = nextHives.find(h => h.id === selectedHiveId);
         if (selectedHive && selectedHive.lastUpdatedTimestamp && selectedHive.lastUpdatedTimestamp >= (currentRealTime - checkInterval)) {
           setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
@@ -301,18 +294,18 @@ const App: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [selectedHiveId]);
   
-  // ---- 4. Update lastUpdated when selected hive changes ----
+  
   useEffect(() => {
     const selectedHive = hivesData.find(h => h.id === selectedHiveId);
     if (selectedHive) {
-      // FIX 3: Use nullish coalescing (??) for safe access
+      
       setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
   }, [selectedHiveId, hivesData]);
 
   const selectedHive = hivesData.find(h => h.id === selectedHiveId);
 
-  // Alerts logic (remains unchanged)
+  
   useEffect(() => {
     if (!selectedHive || !selectedHive.sensorData.timestamp) return;
 
@@ -386,10 +379,9 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     try {
       let response: GenerateContentResponse;
       if (options.image) {
-        // Removed image handling since it's not supported right now.
-        // This path should ideally not be reachable based on your UI state.
+      
         response = await chatInstance.sendMessage({
-          message: finalPrompt // Send text only as a fallback
+          message: finalPrompt 
         });
       } else {
         response = await chatInstance.sendMessage({
