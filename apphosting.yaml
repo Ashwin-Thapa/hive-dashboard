@@ -1,7 +1,7 @@
 # apphosting.yaml
 env:
   - variable: VITE_API_KEY
-    value: "AIzaSyCg8cItZXOXXkR3Ou6IbR1F6ovYe6IXrHc"
+    secret: GEMINI_SECRET_KEY
     availability:
       - BUILD
       - RUNTIME
