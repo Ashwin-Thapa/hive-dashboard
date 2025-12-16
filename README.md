@@ -26,6 +26,7 @@ You need to set up your environment variables to run this application.
 
 1.  **Install dependencies:**
     Open your terminal in the project root and run:
+
     ```bash
     npm install
     ```
@@ -39,7 +40,7 @@ This will start the Vite development server. Open your browser and navigate to t
 
 ## Available Scripts
 
--   `npm run dev`: Runs the app in development mode.
--   `npm run build`: Builds the app for production to the `dist` folder.
--   `npm run preview`: Serves the production build locally.
--   `npm run lint`: Lints the codebase for potential errors.
+- `npm run dev`: Runs the app in development mode.
+- `npm run build`: Builds the app for production to the `dist` folder.
+- `npm run preview`: Serves the production build locally.
+- `npm run lint`: Lints the codebase for potential errors.
