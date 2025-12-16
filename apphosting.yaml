@@ -1,7 +1,7 @@
 # apphosting.yaml
 env:
   - variable: VITE_API_KEY
-    value: "AIzaSyBpFCDgczQF0el2UskFMOQyTyZMOzhfZrg"
+    value: "AIzaSyCg8cItZXOXXkR3Ou6IbR1F6ovYe6IXrHc"
     availability:
       - BUILD
       - RUNTIME
