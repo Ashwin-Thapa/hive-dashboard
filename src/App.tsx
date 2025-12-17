@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertType } from './types';
 import type { SensorData, Alert, HistoryEntry, Hive, ChatMessage } from './types';
-import type { GenerateContentResponse } from '@google/genai';
 import {
   TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH,
   HUMIDITY_IDEAL_MIN, HUMIDITY_IDEAL_MAX, HUMIDITY_WARNING_LOW, HUMIDITY_WARNING_HIGH,
   SOUND_IDEAL_MIN, SOUND_IDEAL_MAX, SOUND_WARNING_LOW, SOUND_WARNING_HIGH, SOUND_CRITICAL_HIGH,
 } from './constants';
-import { createChatSession } from './services/geminiService';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from './services/firebase';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -19,7 +19,7 @@ import HiveSelector from './components/HiveSelector';
 import LiveInfo from './components/LiveInfo';
 import ChatInterface from './components/ChatInterface';
 
-
+// --- Type Definitions for Simulation ---
 type SimFields = {
   simEnabled: boolean;
   simClock?: number; 
@@ -38,8 +38,24 @@ type SimFields = {
   imageTimestamp?: number;
   lastUpdatedTimestamp?: number; 
 };
-type HiveSim = Hive & SimFields;
 
+type HiveSim = Hive & SimFields & {
+  chatHistory: ChatMessage[];
+};
+
+// --- Type Definitions for API Calls ---
+// This interface defines EXACTLY what the Cloud Function expects
+interface GenerateContentRequest {
+  prompt: string;
+  history?: ChatMessage[]; // <--- Added this to fix the error
+  image?: { base64: string; mimeType: string } | null;
+}
+
+interface GenerateContentResponse {
+  text: string;
+}
+
+// --- Simulation Helpers ---
 const randBetween = (min: number, max: number) => min + Math.random() * (max - min);
 
 const stepAround = (current: number, step: number, min: number, max: number) => {
@@ -68,9 +84,9 @@ const buildSimHistory = (
     tClock += stepMs;
 
     temp = stepAround(temp, cfg.stepTemp, 30, 40); 
-    hum  = stepAround(hum,  cfg.stepHum,  45, 80); 
-    snd  = stepAround(snd,  cfg.stepSound,30, 80); 
-    wgt  = stepAround(wgt,  cfg.stepWeight, 22000, 35000); 
+    hum = stepAround(hum, cfg.stepHum, 45, 80); 
+    snd = stepAround(snd, cfg.stepSound, 30, 80); 
+    wgt = stepAround(wgt, cfg.stepWeight, 22000, 35000); 
 
     history.push({
       timestamp: tClock,
@@ -86,28 +102,25 @@ const buildSimHistory = (
 };
 
 const getNextRandomUpdateTime = (currentTimestamp: number): number => {
-   
-    const randomDelay = randBetween(1000, 600000);
-    return currentTimestamp + randomDelay;
+  const randomDelay = randBetween(1000, 600000);
+  return currentTimestamp + randomDelay;
 };
 
 const getISTHour = (): number => {
- 
   const now = new Date();
   const options: Intl.DateTimeFormatOptions = { 
-      hour: 'numeric', 
-      hour12: false, 
-      timeZone: "Asia/Kolkata" 
+    hour: 'numeric', 
+    hour12: false, 
+    timeZone: "Asia/Kolkata" 
   };
   const istHourString = now.toLocaleString("en-US", options);
-  
   return parseInt(istHourString, 10);
 };
 
-
+// --- Main Component ---
 const App: React.FC = () => {
   const [hivesData, setHivesData] = useState<HiveSim[]>([]);
-  const [selectedHiveId, setSelectedHiveId] = useState<string | null>('bwise-1');
+  const [selectedHiveId, setSelectedHiveId] = useState<string>('bwise-1');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isHistoryModalOpen, setHistoryModalOpen] = useState(false);
@@ -115,13 +128,17 @@ const App: React.FC = () => {
   const [isChatLoading, setChatLoading] = useState(false);
   const objectURLsRef = useRef<string[]>([]);
 
+  // Initialize Firebase Cloud Function with CORRECT Types
+  const generateContentCallable = httpsCallable<GenerateContentRequest, GenerateContentResponse>(
+    functions,
+    'generateContent'
+  );
 
   useEffect(() => {
     const initialHives: HiveSim[] = [];
     const NOW = Date.now(); 
 
     for (let j = 1; j <= 10; j++) {
-
       const simConfig = {
         baseTemp: randBetween(33, 36), 
         baseHum: randBetween(55, 65),
@@ -164,7 +181,6 @@ const App: React.FC = () => {
         sensorData: shiftedLast,
         fullHistory: shiftedHistory,
         weightHistory: shiftedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-        chat: createChatSession(),
         chatHistory: [],
         simEnabled: true, 
         simClock: shiftedLastClock,
@@ -175,11 +191,9 @@ const App: React.FC = () => {
     }
 
     setHivesData(initialHives);
-    
 
     const initialSelectedHive = initialHives.find(h => h.id === selectedHiveId);
     if (initialSelectedHive) {
-
       setLastUpdated(new Date(initialSelectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
 
@@ -189,32 +203,22 @@ const App: React.FC = () => {
     };
   }, []);
 
-
-  useEffect(() => {
-    return () => {};
-  }, [selectedHiveId]);
-
-
   useEffect(() => {
     const checkInterval = 60000; 
     const simulationStep = 600000; 
 
     const intervalId = setInterval(() => {
       const currentRealTime = Date.now();
-      
-
       const currentHour = getISTHour(); 
 
- 
       if (currentHour < 5 || currentHour >= 18) {
         return; 
       }
       
       setHivesData(prevHives => {
         const nextHives = prevHives.map(hive => {
-
           if (!hive.simEnabled || (hive.nextSimUpdateTime && currentRealTime < hive.nextSimUpdateTime)) {
-              return hive;
+            return hive;
           }
 
           const cfg = hive.simConfig ?? {
@@ -223,38 +227,31 @@ const App: React.FC = () => {
           };
 
           const last = hive.sensorData || {
-            temperature: cfg.baseTemp, humidity: cfg.baseHum, sound: cfg.baseSound, 
-            weight: cfg.baseWeight, timestamp: currentRealTime - simulationStep,
+            temperature: cfg.baseTemp, 
+            humidity: cfg.baseHum, 
+            sound: cfg.baseSound, 
+            weight: cfg.baseWeight, 
+            timestamp: currentRealTime - simulationStep,
           };
 
-          const nextClock = currentRealTime; 
-
           const temperature = stepAround(last.temperature, cfg.stepTemp, 30, 40);
-          const humidity  = stepAround(last.humidity, cfg.stepHum, 45, 80);
-          const sound = stepAround(last.sound, cfg.stepSound,30, 80);
+          const humidity = stepAround(last.humidity, cfg.stepHum, 45, 80);
+          const sound = stepAround(last.sound, cfg.stepSound, 30, 80);
 
           let finalWeight = last.weight;
           let dailyWeightChange = 0;
           const gramChangeRate = 50; 
 
           if (currentHour >= 7 && currentHour < 11) {
-            
             dailyWeightChange = -randBetween(0.5, 1.5) * (gramChangeRate / 10); 
           } else if (currentHour >= 11 && currentHour < 19) {
-            
             dailyWeightChange = randBetween(0.5, 3.0) * (gramChangeRate / 10); 
           } else { 
-             
-             dailyWeightChange = -randBetween(0.1, 0.5) * (gramChangeRate / 20); 
+            dailyWeightChange = -randBetween(0.1, 0.5) * (gramChangeRate / 20); 
           }
 
-          
           const noise = randBetween(-cfg.stepWeight, cfg.stepWeight) * 0.5;
-
-          
           finalWeight = Math.round(finalWeight + dailyWeightChange + noise);
-
-          
           finalWeight = Math.max(22000, Math.min(35000, finalWeight));
 
           const newSensorData: SensorData = {
@@ -262,12 +259,10 @@ const App: React.FC = () => {
             humidity,
             sound,
             weight: finalWeight,
-            timestamp: nextClock,
+            timestamp: currentRealTime,
           };
           
           const updatedHistory = [...hive.fullHistory.slice(-99), newSensorData];
-
-          
           const nextUpdate = getNextRandomUpdateTime(currentRealTime);
 
           return {
@@ -275,13 +270,12 @@ const App: React.FC = () => {
             sensorData: newSensorData,
             fullHistory: updatedHistory,
             weightHistory: updatedHistory.map(d => ({ timestamp: d.timestamp, weight: d.weight })),
-            simClock: nextClock,
-            lastUpdatedTimestamp: nextClock,
+            simClock: currentRealTime,
+            lastUpdatedTimestamp: currentRealTime,
             nextSimUpdateTime: nextUpdate, 
           };
         });
 
-        
         const selectedHive = nextHives.find(h => h.id === selectedHiveId);
         if (selectedHive && selectedHive.lastUpdatedTimestamp && selectedHive.lastUpdatedTimestamp >= (currentRealTime - checkInterval)) {
           setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
@@ -294,32 +288,38 @@ const App: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [selectedHiveId]);
   
-  
   useEffect(() => {
     const selectedHive = hivesData.find(h => h.id === selectedHiveId);
     if (selectedHive) {
-      
       setLastUpdated(new Date(selectedHive.lastUpdatedTimestamp ?? Date.now()));
     }
   }, [selectedHiveId, hivesData]);
 
   const selectedHive = hivesData.find(h => h.id === selectedHiveId);
 
-  
   useEffect(() => {
-    if (!selectedHive || !selectedHive.sensorData.timestamp) return;
+    if (!selectedHive || !selectedHive.sensorData) return;
 
     const newAlerts: Alert[] = [];
     const { temperature, humidity, sound } = selectedHive.sensorData;
 
-    if (temperature < TEMPERATURE_WARNING_LOW || temperature > TEMPERATURE_WARNING_HIGH) newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Temperature: ${temperature.toFixed(2)}°C. Outside optimal range.` });
-    else if (temperature < TEMPERATURE_IDEAL_MIN || temperature > TEMPERATURE_IDEAL_MAX) newAlerts.push({ type: AlertType.WARNING, message: `Warning Temperature: ${temperature.toFixed(2)}°C. Slightly outside ideal range.` });
+    if (temperature < TEMPERATURE_WARNING_LOW || temperature > TEMPERATURE_WARNING_HIGH) {
+      newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Temperature: ${temperature.toFixed(2)}°C. Outside optimal range.` });
+    } else if (temperature < TEMPERATURE_IDEAL_MIN || temperature > TEMPERATURE_IDEAL_MAX) {
+      newAlerts.push({ type: AlertType.WARNING, message: `Warning Temperature: ${temperature.toFixed(2)}°C. Slightly outside ideal range.` });
+    }
 
-    if (humidity < HUMIDITY_WARNING_LOW || humidity > HUMIDITY_WARNING_HIGH) newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Humidity: ${humidity.toFixed(2)}%. May impact health.` });
-    else if (humidity < HUMIDITY_IDEAL_MIN || humidity > HUMIDITY_IDEAL_MAX) newAlerts.push({ type: AlertType.WARNING, message: `Warning Humidity: ${humidity.toFixed(2)}%. Sub-optimal.` });
+    if (humidity < HUMIDITY_WARNING_LOW || humidity > HUMIDITY_WARNING_HIGH) {
+      newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Humidity: ${humidity.toFixed(2)}%. May impact health.` });
+    } else if (humidity < HUMIDITY_IDEAL_MIN || humidity > HUMIDITY_IDEAL_MAX) {
+      newAlerts.push({ type: AlertType.WARNING, message: `Warning Humidity: ${humidity.toFixed(2)}%. Sub-optimal.` });
+    }
 
-    if (sound < SOUND_WARNING_LOW || sound >= SOUND_CRITICAL_HIGH) newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Sound: ${sound.toFixed(2)}dB. Indicates distress.` });
-    else if (sound < SOUND_IDEAL_MIN || sound > SOUND_WARNING_HIGH) newAlerts.push({ type: AlertType.WARNING, message: `Warning Sound: ${sound.toFixed(2)}dB. Unusual activity.` });
+    if (sound < SOUND_WARNING_LOW || sound >= SOUND_CRITICAL_HIGH) {
+      newAlerts.push({ type: AlertType.CRITICAL, message: `Critical Sound: ${sound.toFixed(2)}dB. Indicates distress.` });
+    } else if (sound < SOUND_IDEAL_MIN || sound > SOUND_WARNING_HIGH) {
+      newAlerts.push({ type: AlertType.WARNING, message: `Warning Sound: ${sound.toFixed(2)}dB. Unusual activity.` });
+    }
 
     setAlerts(newAlerts);
   }, [selectedHive]);
@@ -341,25 +341,18 @@ const App: React.FC = () => {
       return;
     }
 
-    const isNewConversation = options.isNewConversation || !currentHive.chat;
-    const chatInstance = isNewConversation ? createChatSession() : currentHive.chat;
-
-    if (!chatInstance) {
-      console.error("Chat instance could not be created or found.");
-      setChatLoading(false);
-      return;
-    }
-
+    // Add user message to chat history
     setHivesData(prevHives => prevHives.map(hive => {
       if (hive.id === selectedHiveId) {
-        const history = isNewConversation ? [] : hive.chatHistory;
+        const history = options.isNewConversation ? [] : hive.chatHistory;
         const userMessage: ChatMessage = { role: 'user', content: prompt };
         const updatedHistory = [...history, userMessage];
-        return { ...hive, chatHistory: updatedHistory, chat: chatInstance };
+        return { ...hive, chatHistory: updatedHistory };
       }
       return hive;
     }));
 
+    // Build final prompt with sensor data for analysis requests
     let finalPrompt = prompt;
     const analysisKeywords = ['analyze', 'analysis', 'sensor', 'data', 'summary', 'status', 'report', 'check'];
     const lowerCasePrompt = prompt.toLowerCase();
@@ -377,20 +370,23 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     }
 
     try {
-      let response: GenerateContentResponse;
-      if (options.image) {
-      
-        response = await chatInstance.sendMessage({
-          message: finalPrompt 
-        });
-      } else {
-        response = await chatInstance.sendMessage({
-          message: finalPrompt
-        });
-      }
+      // Get the latest state for history
+      // Note: We need to manually append the user message we just added above to ensure it's in the history sent to AI
+      // OR rely on state, but state updates are async. 
+      // BEST PRACTICE: Use the computed array we created for the state update
+      const history = options.isNewConversation ? [] : currentHive.chatHistory;
+      const userMessage: ChatMessage = { role: 'user', content: prompt };
+      const historyForAi = [...history, userMessage];
 
-      const modelResponse: string = response.text ?? "No response from AI model.";
+      const response = await generateContentCallable({ 
+        prompt: finalPrompt, 
+        history: historyForAi, // Correctly passing history
+        image: options.image || null 
+      });
 
+      const modelResponse: string = response.data.text ?? "No response from AI model.";
+
+      // Update hive with AI response
       setHivesData(prevHives => prevHives.map(hive => {
         if (hive.id === selectedHiveId) {
           const aiMessage: ChatMessage = { role: 'model', content: modelResponse };
@@ -409,9 +405,13 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     } finally {
       setChatLoading(false);
     }
-  }, [selectedHiveId, hivesData]);
+  }, [selectedHiveId, hivesData, generateContentCallable]);
 
-  const handleHistoryClick = () => { setHistoryLoading(true); setHistoryModalOpen(true); setTimeout(() => setHistoryLoading(false), 500); };
+  const handleHistoryClick = () => { 
+    setHistoryLoading(true); 
+    setHistoryModalOpen(true); 
+    setTimeout(() => setHistoryLoading(false), 500); 
+  };
 
   const getStatusColor = useCallback((value: number, idealMin: number, idealMax: number, warnMin: number, warnMax: number): AlertType => {
     if (value < warnMin || value > warnMax) return AlertType.CRITICAL;
@@ -419,7 +419,13 @@ Remember to respond as Bwise, the friendly apiculturist.`;
     return AlertType.OK;
   }, []);
 
-  if (!selectedHive) return <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">Loading Apiary Dashboard...</div>;
+  if (!selectedHive) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-100 text-gray-800 text-xl">
+        Loading Apiary Dashboard...
+      </div>
+    );
+  }
 
   const { sensorData, weightHistory, fullHistory, chatHistory } = selectedHive;
   const tempStatus = getStatusColor(sensorData.temperature, TEMPERATURE_IDEAL_MIN, TEMPERATURE_IDEAL_MAX, TEMPERATURE_WARNING_LOW, TEMPERATURE_WARNING_HIGH);
@@ -428,18 +434,28 @@ Remember to respond as Bwise, the friendly apiculturist.`;
 
   return (
     <>
-      <Modal isOpen={isHistoryModalOpen} onClose={() => setHistoryModalOpen(false)} title={`Recent History for ${selectedHive.name} (Last 100 Records)`}>
-        {isHistoryLoading ? <p>Loading history...</p> : (
+      <Modal 
+        isOpen={isHistoryModalOpen} 
+        onClose={() => setHistoryModalOpen(false)} 
+        title={`Recent History for ${selectedHive.name} (Last 100 Records)`}
+      >
+        {isHistoryLoading ? (
+          <p>Loading history...</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-700">
               <thead className="text-xs text-gray-500 uppercase bg-gray-100">
                 <tr>
-                  <th scope="col" className="px-4 py-3">Timestamp</th><th scope="col" className="px-4 py-3">Temp (°C)</th><th scope="col" className="px-4 py-3">Humidity (%)</th><th scope="col" className="px-4 py-3">Weight (g)</th><th scope="col" className="px-4 py-3">Sound (dB)</th>
+                  <th scope="col" className="px-4 py-3">Timestamp</th>
+                  <th scope="col" className="px-4 py-3">Temp (°C)</th>
+                  <th scope="col" className="px-4 py-3">Humidity (%)</th>
+                  <th scope="col" className="px-4 py-3">Weight (g)</th>
+                  <th scope="col" className="px-4 py-3">Sound (dB)</th>
                 </tr>
               </thead>
               <tbody>
                 {[...fullHistory].reverse().map((reading, index) => (
-                  <tr key={reading.timestamp + '-' + index} className="border-b border-gray-200 hover:bg-gray-50">
+                  <tr key={`${reading.timestamp}-${index}`} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="px-4 py-2">{new Date(reading.timestamp).toLocaleString()}</td>
                     <td className="px-4 py-2">{reading.temperature.toFixed(2)}</td>
                     <td className="px-4 py-2">{reading.humidity.toFixed(2)}</td>
@@ -458,27 +474,65 @@ Remember to respond as Bwise, the friendly apiculturist.`;
         <Header />
 
         <main className="max-w-7xl mx-auto">
-          <HiveSelector hives={hivesData} selectedHiveId={selectedHive.id} onSelectHive={(id) => { setChatLoading(false); setSelectedHiveId(id); }} />
+          <HiveSelector 
+            hives={hivesData} 
+            selectedHiveId={selectedHive.id} 
+            onSelectHive={(id) => { 
+              setChatLoading(false); 
+              setSelectedHiveId(id); 
+            }} 
+          />
 
           <div className="text-center mb-6">
-            <p className="text-sm text-gray-500">Displaying data for <span className="font-bold">{selectedHive.name}</span></p>
-            {/* Display lastUpdated safely */}
-            <p className="text-sm text-gray-500">Last Updated: {lastUpdated?.toLocaleString() ?? 'Loading...'}</p>
-            
+            <p className="text-sm text-gray-500">
+              Displaying data for <span className="font-bold">{selectedHive.name}</span>
+            </p>
+            <p className="text-sm text-gray-500">
+              Last Updated: {lastUpdated?.toLocaleString() ?? 'Loading...'}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl p-4 shadow-md"><GaugeChart value={sensorData.temperature} title="Temperature" unit="°C" min={10} max={50} status={tempStatus} /></div>
-            <div className="bg-white rounded-xl p-4 shadow-md"><GaugeChart value={sensorData.humidity} title="Humidity" unit="%" min={20} max={90} status={humidityStatus} /></div>
-            <div className="bg-white rounded-xl p-4 shadow-md"><GaugeChart value={sensorData.sound} title="Sound" unit="dB" min={10} max={100} status={soundStatus} /></div>
+            <div className="bg-white rounded-xl p-4 shadow-md">
+              <GaugeChart 
+                value={sensorData.temperature} 
+                title="Temperature" 
+                unit="°C" 
+                min={10} 
+                max={50} 
+                status={tempStatus} 
+              />
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-md">
+              <GaugeChart 
+                value={sensorData.humidity} 
+                title="Humidity" 
+                unit="%" 
+                min={20} 
+                max={90} 
+                status={humidityStatus} 
+              />
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-md">
+              <GaugeChart 
+                value={sensorData.sound} 
+                title="Sound" 
+                unit="dB" 
+                min={10} 
+                max={100} 
+                status={soundStatus} 
+              />
+            </div>
 
-            <div className="lg:col-span-3 bg-white rounded-xl p-4 shadow-md flex flex-col"><AlertsCard alerts={alerts} /></div>
+            <div className="lg:col-span-3 bg-white rounded-xl p-4 shadow-md flex flex-col">
+              <AlertsCard alerts={alerts} />
+            </div>
 
             <div className="lg:col-span-2 bg-white rounded-xl p-4 shadow-md flex flex-col">
               <ChatInterface
                 hiveName={selectedHive.name}
                 chatHistory={chatHistory}
-                onSendMessage={(msg) => handleSendMessage(msg)}
+                onSendMessage={handleSendMessage}
                 isLoading={isChatLoading}
               />
             </div>
