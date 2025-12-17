@@ -2,7 +2,7 @@
 env:
   - variable: VITE_API_KEY
     # Use the full resource path to avoid any ambiguity
-    secret: projects/mesh-c5677/secrets/GEMINI_SECRET_KEY
+    secret: GEMINI_SECRET_KEY
     availability:
       - BUILD
       - RUNTIME
